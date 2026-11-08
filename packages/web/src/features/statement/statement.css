@@ -1,0 +1,229 @@
+/* Printable statement (pages/Statement.tsx). Prefix `st-`. Screen: a sheet on the page; print: plain paper. */
+
+.st {
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+.st-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.st-paper {
+  padding: var(--space-6) var(--space-6) var(--space-5);
+  background: var(--surface);
+  border: var(--border);
+  border-radius: var(--radius-card);
+}
+
+.st-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: var(--rule-single);
+}
+
+.st-company {
+  margin-top: var(--space-3);
+  font-size: var(--text-16);
+  font-weight: var(--weight-semibold);
+}
+
+.st-muted {
+  font-size: var(--text-13);
+  color: var(--muted);
+}
+
+.st-head-meta {
+  text-align: right;
+}
+
+.st-head-meta h1 {
+  font-family: var(--font-mono);
+  font-size: var(--text-13);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.st-head-meta dl {
+  margin: var(--space-2) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--text-13);
+}
+
+.st-head-meta dl > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.st-head-meta dt {
+  color: var(--muted);
+}
+
+.st-head-meta dd {
+  margin: 0;
+  color: var(--ink);
+}
+
+.st-open {
+  margin-top: var(--space-3);
+}
+
+.st-hero {
+  padding: var(--space-5) 0 var(--space-4);
+}
+
+.st-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-12);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.st-charge {
+  display: inline-block;
+  margin: 8px 0 10px;
+  padding-bottom: 4px;
+  border-bottom: var(--rule-double);
+  font-size: var(--text-56);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.st-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+
+.st-section {
+  margin-top: var(--space-5);
+}
+
+.st-paper h2 {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: var(--border);
+  font-size: var(--text-13);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0;
+}
+
+.st-ledger {
+  font-size: var(--text-13);
+}
+
+.st-ledger .ui-ledger-label {
+  white-space: normal;
+}
+
+.st-ledger .st-sub {
+  color: var(--muted);
+}
+
+.st-voided .ui-ledger-label,
+.st-voided .ui-ledger-amount {
+  color: var(--muted);
+}
+
+.st-note {
+  margin-top: 10px;
+  font-size: var(--text-12);
+  color: var(--muted);
+}
+
+.st-refs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--text-13);
+}
+
+.st-refs > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.st-refs dt {
+  color: var(--muted);
+}
+
+.st-refs dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.st-policy-title {
+  margin-top: var(--space-3);
+}
+
+.st-foot {
+  margin-top: var(--space-6);
+  padding-top: var(--space-2);
+  border-top: var(--border);
+  font-size: var(--text-12);
+  color: var(--muted);
+}
+
+.st-paper .ui-table th:first-child,
+.st-paper .ui-table td:first-child {
+  padding-left: 0;
+}
+
+.st-paper .ui-table th:last-child,
+.st-paper .ui-table td:last-child {
+  padding-right: 0;
+}
+
+@media (max-width: 1100px) {
+  .st-paper {
+    padding: var(--space-5) var(--space-4) var(--space-4);
+  }
+}
+
+@media print {
+  @page {
+    margin: 16mm 14mm;
+  }
+  .st {
+    max-width: none;
+  }
+  .st-paper {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+  }
+  .st-hero,
+  .st-columns > section,
+  .st-section,
+  .st-head {
+    break-inside: avoid;
+  }
+  .st-paper .ui-table thead {
+    display: table-header-group;
+  }
+  .st-paper .ui-table tr {
+    break-inside: avoid;
+  }
+  .st-open {
+    border: 1px solid #000;
+    background: #fff;
+  }
+  .st-foot {
+    break-before: avoid;
+  }
+}
