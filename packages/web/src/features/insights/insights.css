@@ -1,0 +1,156 @@
+/* Insights page. Tokens only (styles/tokens.css); chart colors are applied in JS from the same tokens. */
+
+.ins-page {
+  display: grid;
+  gap: var(--space-6);
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.ins-page > .ui-page-head {
+  margin-bottom: calc(-1 * var(--space-2));
+}
+
+.ins-loading {
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+}
+
+/* ------------------------------------------------------------ sections */
+
+.ins-section {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.ins-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.ins-section-head h2 {
+  font-size: var(--text-20);
+}
+
+.ins-section-head p {
+  margin-top: var(--space-half);
+  color: var(--muted);
+  font-size: var(--text-13);
+}
+
+/* ------------------------------------------------------------ KPI strip */
+
+.ins-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: var(--surface);
+  border: var(--border);
+  border-radius: var(--radius-card);
+}
+
+.ins-kpis > .ui-stat {
+  padding: var(--space-2) var(--space-3);
+}
+
+.ins-kpis > .ui-stat + .ui-stat {
+  border-left: var(--border);
+}
+
+.ins-kpis .ui-stat-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ins-kpi-text {
+  font-family: var(--font-sans);
+  letter-spacing: var(--tracking-tight);
+}
+
+@media (max-width: 900px) {
+  .ins-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ins-kpis > .ui-stat:nth-child(3) {
+    border-left: 0;
+  }
+  .ins-kpis > .ui-stat:nth-child(n + 3) {
+    border-top: var(--border);
+  }
+}
+
+/* ------------------------------------------------------------ chart cards */
+
+.ins-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: var(--space-2);
+}
+
+.ins-chart-card {
+  min-width: 0;
+}
+
+.ins-chart-card .ui-card-head {
+  align-items: center;
+}
+
+.ins-chart {
+  position: relative;
+  transition: opacity var(--duration) var(--ease-out);
+}
+
+.ins-chart[data-stale="true"] {
+  opacity: 0.55;
+}
+
+.ins-chart-table {
+  overflow: auto;
+}
+
+.ins-chart-empty {
+  display: grid;
+  place-items: center;
+}
+
+.ins-table-stack {
+  display: grid;
+  gap: var(--space-3);
+}
+
+/* ------------------------------------------------------------ AG Studio */
+
+.ins-studio-card .ui-card-head {
+  align-items: center;
+}
+
+.ins-studio-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.ins-studio-note {
+  padding: var(--space-1) var(--space-3);
+  border-bottom: var(--border);
+  background: var(--warning-soft);
+  color: var(--ink-2);
+  font-size: var(--text-13);
+}
+
+.ins-studio {
+  height: 780px;
+  border-bottom-left-radius: var(--radius-card);
+  border-bottom-right-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+@media (max-width: 1100px) {
+  .ins-studio {
+    height: 720px;
+  }
+}
