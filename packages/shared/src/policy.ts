@@ -71,8 +71,11 @@ export const policySchema = z.object({
   alarms: alarmRulesSchema,
 });
 
+/** A policy with any field, and any alarm rule, left out. */
+export type PolicyInput = Partial<Omit<Policy, "alarms">> & { alarms?: Partial<AlarmRules> };
+
 /** Merge a partial policy over the defaults and keep fields consistent with each other. */
-export function normalizePolicy(partial: Partial<Policy> & { alarms?: Partial<AlarmRules> } = {}): Policy {
+export function normalizePolicy(partial: PolicyInput = {}): Policy {
   const merged: Policy = {
     ...DEFAULT_POLICY,
     ...partial,

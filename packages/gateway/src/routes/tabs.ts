@@ -95,8 +95,7 @@ export const tabRoutes: RoutePlugin = async (app, { ctx }) => {
 
   app.post("/api/tabs", async (request, reply) => {
     const input = parseInput(tabCreateSchema, request.body);
-    // normalizePolicy merges partial alarms at runtime; its parameter type only spells out the top level.
-    const policy = normalizePolicy(input.policy as Parameters<typeof normalizePolicy>[0]);
+    const policy = normalizePolicy(input.policy);
     if (!stmt(ctx.db, "SELECT 1 FROM companies WHERE id = ?").get(input.companyId)) throw notFound("Company", input.companyId);
     const open = stmt(
       ctx.db,
