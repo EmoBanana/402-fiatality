@@ -1,0 +1,1123 @@
+{
+ "_comment": "Captured from AG Grid Enterprise 36.3 (getStructuredSchema with includeSetValues on sellerId/status/voidReason, then getState) in headless Chromium.",
+ "schema": {
+  "type": "object",
+  "required": [
+   "aggregation",
+   "filter",
+   "sort",
+   "columnVisibility",
+   "columnSizing",
+   "rowGroup"
+  ],
+  "additionalProperties": false,
+  "properties": {
+   "aggregation": {
+    "type": [
+     "object",
+     "null"
+    ],
+    "description": "Aggregation configuration for the grid",
+    "required": [
+     "aggregationModel"
+    ],
+    "additionalProperties": false,
+    "properties": {
+     "aggregationModel": {
+      "type": "array",
+      "description": "Array of column aggregations",
+      "items": {
+       "anyOf": [
+        {
+         "type": "object",
+         "required": [
+          "colId",
+          "aggFunc"
+         ],
+         "additionalProperties": false,
+         "properties": {
+          "colId": {
+           "type": "string",
+           "description": "Column identifier",
+           "enum": [
+            "priceMicros"
+           ]
+          },
+          "aggFunc": {
+           "type": "string",
+           "description": "Aggregation function",
+           "enum": [
+            "sum",
+            "avg",
+            "max",
+            "min",
+            "count",
+            "first",
+            "last"
+           ]
+          }
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "filter": {
+    "type": [
+     "object",
+     "null"
+    ],
+    "required": [
+     "filterModel"
+    ],
+    "additionalProperties": false,
+    "properties": {
+     "filterModel": {
+      "type": "object",
+      "required": [
+       "id",
+       "sellerId",
+       "status",
+       "voidReason",
+       "priceMicros",
+       "createdAt",
+       "taskId",
+       "agentId",
+       "path",
+       "latencyMs"
+      ],
+      "additionalProperties": false,
+      "properties": {
+       "id": {
+        "type": [
+         "object",
+         "null"
+        ],
+        "required": [
+         "filterType",
+         "operator",
+         "conditions"
+        ],
+        "additionalProperties": false,
+        "properties": {
+         "filterType": {
+          "type": "string",
+          "description": "Filter type identifier for text filters with multiple conditions",
+          "enum": [
+           "text"
+          ]
+         },
+         "operator": {
+          "type": "string",
+          "description": "Logical operator to combine multiple filter conditions. Must be included even with a single filter to adhere to the API.",
+          "enum": [
+           "AND",
+           "OR"
+          ]
+         },
+         "conditions": {
+          "type": "array",
+          "description": "Array of filter conditions to be combined",
+          "items": {
+           "type": "object",
+           "required": [
+            "filterType",
+            "type",
+            "filter",
+            "filterTo"
+           ],
+           "additionalProperties": false,
+           "properties": {
+            "filterType": {
+             "type": "string",
+             "description": "Filter type identifier for text filters",
+             "enum": [
+              "text"
+             ]
+            },
+            "type": {
+             "type": "string",
+             "description": "Text filter operation type",
+             "enum": [
+              "contains",
+              "notContains",
+              "equals",
+              "notEqual",
+              "startsWith",
+              "endsWith",
+              "blank",
+              "notBlank"
+             ]
+            },
+            "filter": {
+             "type": [
+              "string",
+              "null"
+             ],
+             "description": "Primary filter value"
+            },
+            "filterTo": {
+             "type": [
+              "string",
+              "null"
+             ],
+             "description": "Secondary filter value for range operations"
+            }
+           }
+          },
+          "minItems": 2,
+          "maxItems": 2
+         }
+        }
+       },
+       "sellerId": {
+        "type": [
+         "object",
+         "null"
+        ],
+        "required": [
+         "filterType",
+         "values"
+        ],
+        "additionalProperties": false,
+        "properties": {
+         "filterType": {
+          "type": "string",
+          "description": "Filter type identifier for set filters",
+          "enum": [
+           "set"
+          ]
+         },
+         "values": {
+          "type": "array",
+          "description": "Array of values to include in the filter",
+          "items": {
+           "type": "string",
+           "description": "Available values to filter by",
+           "enum": [
+            "channel3",
+            "reviews",
+            "pricewatch"
+           ]
+          }
+         }
+        }
+       },
+       "status": {
+        "type": [
+         "object",
+         "null"
+        ],
+        "required": [
+         "filterType",
+         "values"
+        ],
+        "additionalProperties": false,
+        "properties": {
+         "filterType": {
+          "type": "string",
+          "description": "Filter type identifier for set filters",
+          "enum": [
+           "set"
+          ]
+         },
+         "values": {
+          "type": "array",
+          "description": "Array of values to include in the filter",
+          "items": {
+           "type": "string",
+           "description": "Available values to filter by",
+           "enum": [
+            "accepted",
+            "voided"
+           ]
+          }
+         }
+        }
+       },
+       "voidReason": {
+        "type": [
+         "object",
+         "null"
+        ],
+        "required": [
+         "filterType",
+         "values"
+        ],
+        "additionalProperties": false,
+        "properties": {
+         "filterType": {
+          "type": "string",
+          "description": "Filter type identifier for set filters",
+          "enum": [
+           "set"
+          ]
+         },
+         "values": {
+          "type": "array",
+          "description": "Array of values to include in the filter",
+          "items": {
+           "type": "string",
+           "description": "Available values to filter by",
+           "enum": [
+            "upstream_5xx"
+           ]
+          }
+         }
+        }
+       },
+       "priceMicros": {
+        "type": [
+         "object",
+         "null"
+        ],
+        "required": [
+         "filterType",
+         "operator",
+         "conditions"
+        ],
+        "additionalProperties": false,
+        "properties": {
+         "filterType": {
+          "type": "string",
+          "description": "Filter type identifier for number filters with multiple conditions",
+          "enum": [
+           "number"
+          ]
+         },
+         "operator": {
+          "type": "string",
+          "description": "Logical operator to combine multiple filter conditions. Must be included even with a single filter to adhere to the API.",
+          "enum": [
+           "AND",
+           "OR"
+          ]
+         },
+         "conditions": {
+          "type": "array",
+          "description": "Array of filter conditions to be combined",
+          "items": {
+           "type": "object",
+           "required": [
+            "filterType",
+            "type",
+            "filter",
+            "filterTo"
+           ],
+           "additionalProperties": false,
+           "properties": {
+            "filterType": {
+             "type": "string",
+             "description": "Filter type identifier for number filters",
+             "enum": [
+              "number"
+             ]
+            },
+            "type": {
+             "type": "string",
+             "description": "Number filter operation type",
+             "enum": [
+              "equals",
+              "notEqual",
+              "greaterThan",
+              "greaterThanOrEqual",
+              "lessThan",
+              "lessThanOrEqual",
+              "inRange",
+              "blank",
+              "notBlank"
+             ]
+            },
+            "filter": {
+             "type": [
+              "number",
+              "null"
+             ],
+             "description": "Primary filter value"
+            },
+            "filterTo": {
+             "type": [
+              "number",
+              "null"
+             ],
+             "description": "Secondary filter value for range operations"
+            }
+           }
+          },
+          "minItems": 2,
+          "maxItems": 2
+         }
+        }
+       },
+       "createdAt": {
+        "type": [
+         "object",
+         "null"
+        ],
+        "required": [
+         "filterType",
+         "operator",
+         "conditions"
+        ],
+        "additionalProperties": false,
+        "properties": {
+         "filterType": {
+          "type": "string",
+          "description": "Filter type identifier for date filters with multiple conditions",
+          "enum": [
+           "date"
+          ]
+         },
+         "operator": {
+          "type": "string",
+          "description": "Logical operator to combine multiple filter conditions. Must be included even with a single filter to adhere to the API.",
+          "enum": [
+           "AND",
+           "OR"
+          ]
+         },
+         "conditions": {
+          "type": "array",
+          "description": "Array of filter conditions to be combined",
+          "items": {
+           "type": "object",
+           "required": [
+            "filterType",
+            "type",
+            "dateFrom",
+            "dateTo"
+           ],
+           "additionalProperties": false,
+           "properties": {
+            "filterType": {
+             "type": "string",
+             "description": "Filter type identifier for date filters",
+             "enum": [
+              "date"
+             ]
+            },
+            "type": {
+             "type": "string",
+             "description": "Date filter operation type",
+             "enum": [
+              "equals",
+              "notEqual",
+              "lessThan",
+              "greaterThan",
+              "inRange",
+              "blank",
+              "notBlank"
+             ]
+            },
+            "dateFrom": {
+             "type": [
+              "string",
+              "null"
+             ],
+             "description": "Primary date filter value in YYYY-MM-DD HH:mm:ss format",
+             "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$"
+            },
+            "dateTo": {
+             "type": [
+              "string",
+              "null"
+             ],
+             "description": "Secondary date filter value for range operations in YYYY-MM-DD HH:mm:ss format",
+             "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$"
+            }
+           }
+          },
+          "minItems": 2,
+          "maxItems": 2
+         }
+        }
+       },
+       "taskId": {
+        "type": [
+         "object",
+         "null"
+        ],
+        "required": [
+         "filterType",
+         "filterModels"
+        ],
+        "additionalProperties": false,
+        "properties": {
+         "filterType": {
+          "type": "string",
+          "description": "Filter type identifier for multi-condition filters",
+          "enum": [
+           "multi"
+          ]
+         },
+         "filterModels": {
+          "type": "array",
+          "description": "Array of filter conditions to be combined with AND/OR logic",
+          "items": {
+           "anyOf": [
+            {
+             "type": "object",
+             "required": [
+              "filterType",
+              "operator",
+              "conditions"
+             ],
+             "additionalProperties": false,
+             "properties": {
+              "filterType": {
+               "type": "string",
+               "description": "Filter type identifier for text filters with multiple conditions",
+               "enum": [
+                "text"
+               ]
+              },
+              "operator": {
+               "type": "string",
+               "description": "Logical operator to combine multiple filter conditions. Must be included even with a single filter to adhere to the API.",
+               "enum": [
+                "AND",
+                "OR"
+               ]
+              },
+              "conditions": {
+               "type": "array",
+               "description": "Array of filter conditions to be combined",
+               "items": {
+                "type": "object",
+                "required": [
+                 "filterType",
+                 "type",
+                 "filter",
+                 "filterTo"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                 "filterType": {
+                  "type": "string",
+                  "description": "Filter type identifier for text filters",
+                  "enum": [
+                   "text"
+                  ]
+                 },
+                 "type": {
+                  "type": "string",
+                  "description": "Text filter operation type",
+                  "enum": [
+                   "contains",
+                   "notContains",
+                   "equals",
+                   "notEqual",
+                   "startsWith",
+                   "endsWith",
+                   "blank",
+                   "notBlank"
+                  ]
+                 },
+                 "filter": {
+                  "type": [
+                   "string",
+                   "null"
+                  ],
+                  "description": "Primary filter value"
+                 },
+                 "filterTo": {
+                  "type": [
+                   "string",
+                   "null"
+                  ],
+                  "description": "Secondary filter value for range operations"
+                 }
+                }
+               },
+               "minItems": 2,
+               "maxItems": 2
+              }
+             }
+            },
+            {
+             "type": "object",
+             "required": [
+              "filterType",
+              "values"
+             ],
+             "additionalProperties": false,
+             "properties": {
+              "filterType": {
+               "type": "string",
+               "description": "Filter type identifier for set filters",
+               "enum": [
+                "set"
+               ]
+              },
+              "values": {
+               "type": "array",
+               "description": "Array of values to include in the filter",
+               "items": {
+                "type": "string",
+                "description": "Filter values"
+               }
+              }
+             }
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "description": "Union of different filter types that can be combined"
+          }
+         }
+        }
+       },
+       "agentId": {
+        "type": [
+         "object",
+         "null"
+        ],
+        "required": [
+         "filterType",
+         "values"
+        ],
+        "additionalProperties": false,
+        "properties": {
+         "filterType": {
+          "type": "string",
+          "description": "Filter type identifier for set filters",
+          "enum": [
+           "set"
+          ]
+         },
+         "values": {
+          "type": "array",
+          "description": "Array of values to include in the filter",
+          "items": {
+           "type": "string",
+           "description": "Filter values"
+          }
+         }
+        }
+       },
+       "path": {
+        "type": [
+         "object",
+         "null"
+        ],
+        "required": [
+         "filterType",
+         "values"
+        ],
+        "additionalProperties": false,
+        "properties": {
+         "filterType": {
+          "type": "string",
+          "description": "Filter type identifier for set filters",
+          "enum": [
+           "set"
+          ]
+         },
+         "values": {
+          "type": "array",
+          "description": "Array of values to include in the filter",
+          "items": {
+           "type": "string",
+           "description": "Filter values"
+          }
+         }
+        }
+       },
+       "latencyMs": {
+        "type": [
+         "object",
+         "null"
+        ],
+        "required": [
+         "filterType",
+         "operator",
+         "conditions"
+        ],
+        "additionalProperties": false,
+        "properties": {
+         "filterType": {
+          "type": "string",
+          "description": "Filter type identifier for number filters with multiple conditions",
+          "enum": [
+           "number"
+          ]
+         },
+         "operator": {
+          "type": "string",
+          "description": "Logical operator to combine multiple filter conditions. Must be included even with a single filter to adhere to the API.",
+          "enum": [
+           "AND",
+           "OR"
+          ]
+         },
+         "conditions": {
+          "type": "array",
+          "description": "Array of filter conditions to be combined",
+          "items": {
+           "type": "object",
+           "required": [
+            "filterType",
+            "type",
+            "filter",
+            "filterTo"
+           ],
+           "additionalProperties": false,
+           "properties": {
+            "filterType": {
+             "type": "string",
+             "description": "Filter type identifier for number filters",
+             "enum": [
+              "number"
+             ]
+            },
+            "type": {
+             "type": "string",
+             "description": "Number filter operation type",
+             "enum": [
+              "equals",
+              "notEqual",
+              "greaterThan",
+              "greaterThanOrEqual",
+              "lessThan",
+              "lessThanOrEqual",
+              "inRange",
+              "blank",
+              "notBlank"
+             ]
+            },
+            "filter": {
+             "type": [
+              "number",
+              "null"
+             ],
+             "description": "Primary filter value"
+            },
+            "filterTo": {
+             "type": [
+              "number",
+              "null"
+             ],
+             "description": "Secondary filter value for range operations"
+            }
+           }
+          },
+          "minItems": 2,
+          "maxItems": 2
+         }
+        }
+       }
+      }
+     }
+    }
+   },
+   "sort": {
+    "type": [
+     "object",
+     "null"
+    ],
+    "description": "Sort configuration for the grid",
+    "required": [
+     "sortModel"
+    ],
+    "additionalProperties": false,
+    "properties": {
+     "sortModel": {
+      "type": "array",
+      "description": "Array of sort configurations",
+      "items": {
+       "type": "object",
+       "required": [
+        "colId",
+        "sort",
+        "type"
+       ],
+       "additionalProperties": false,
+       "properties": {
+        "colId": {
+         "type": "string",
+         "description": "Column ID that supports sorting",
+         "enum": [
+          "id",
+          "sellerId",
+          "status",
+          "voidReason",
+          "priceMicros",
+          "createdAt",
+          "taskId",
+          "agentId",
+          "path",
+          "latencyMs"
+         ]
+        },
+        "sort": {
+         "type": "string",
+         "description": "Sort direction: ascending or descending",
+         "enum": [
+          "asc",
+          "desc"
+         ]
+        },
+        "type": {
+         "type": "string",
+         "description": "Sort type: default or absolute values",
+         "enum": [
+          "default",
+          "absolute"
+         ]
+        }
+       }
+      }
+     }
+    }
+   },
+   "columnVisibility": {
+    "type": [
+     "object",
+     "null"
+    ],
+    "description": "Column visibility configuration for the grid",
+    "required": [
+     "hiddenColIds"
+    ],
+    "additionalProperties": false,
+    "properties": {
+     "hiddenColIds": {
+      "type": "array",
+      "description": "Array of column IDs to hide",
+      "items": {
+       "$ref": "#/$defs/allColumnIds"
+      }
+     }
+    }
+   },
+   "columnSizing": {
+    "type": [
+     "object",
+     "null"
+    ],
+    "description": "Column sizing configuration for the grid",
+    "required": [
+     "columnSizingModel"
+    ],
+    "additionalProperties": false,
+    "properties": {
+     "columnSizingModel": {
+      "type": "array",
+      "description": "Array of column sizing configurations",
+      "items": {
+       "anyOf": [
+        {
+         "type": "object",
+         "required": [
+          "colId",
+          "width"
+         ],
+         "additionalProperties": false,
+         "properties": {
+          "colId": {
+           "$ref": "#/$defs/resizableColumnId"
+          },
+          "width": {
+           "type": "number",
+           "description": "Fixed width in pixels",
+           "minimum": 20
+          }
+         }
+        },
+        {
+         "type": "object",
+         "required": [
+          "colId",
+          "flex"
+         ],
+         "additionalProperties": false,
+         "properties": {
+          "colId": {
+           "$ref": "#/$defs/resizableColumnId"
+          },
+          "flex": {
+           "type": "number",
+           "description": "Flex sizing ratio",
+           "minimum": 0
+          }
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "rowGroup": {
+    "type": [
+     "object",
+     "null"
+    ],
+    "description": "Row grouping configuration for the grid",
+    "required": [
+     "groupColIds"
+    ],
+    "additionalProperties": false,
+    "properties": {
+     "groupColIds": {
+      "type": "array",
+      "description": "Array of column IDs to group by",
+      "items": {
+       "type": "string",
+       "description": "Column ID that supports row grouping",
+       "enum": [
+        "sellerId",
+        "status",
+        "voidReason",
+        "taskId",
+        "agentId"
+       ]
+      }
+     }
+    }
+   }
+  },
+  "$defs": {
+   "allColumnIds": {
+    "type": "string",
+    "description": "id\nsellerId: Seller paid for the call\nstatus: accepted or voided\nvoidReason\npriceMicros: Price in micro-dollars (1 cent = 10000)\ncreatedAt\ntaskId\nagentId\npath\nlatencyMs",
+    "enum": [
+     "id",
+     "sellerId",
+     "status",
+     "voidReason",
+     "priceMicros",
+     "createdAt",
+     "taskId",
+     "agentId",
+     "path",
+     "latencyMs"
+    ]
+   },
+   "resizableColumnId": {
+    "type": "string",
+    "description": "Column ID that supports resizing",
+    "enum": [
+     "id",
+     "sellerId",
+     "status",
+     "voidReason",
+     "priceMicros",
+     "createdAt",
+     "taskId",
+     "agentId",
+     "path",
+     "latencyMs"
+    ]
+   }
+  }
+ },
+ "state": {
+  "version": "36.3.0",
+  "sideBar": {
+   "visible": false,
+   "openToolPanel": null,
+   "toolPanels": {}
+  },
+  "sort": {
+   "sortModel": [
+    {
+     "colId": "createdAt",
+     "sort": "desc",
+     "type": "default"
+    }
+   ]
+  },
+  "aggregation": {
+   "aggregationModel": [
+    {
+     "colId": "priceMicros",
+     "aggFunc": "sum"
+    }
+   ]
+  },
+  "columnSizing": {
+   "columnSizingModel": [
+    {
+     "colId": "id",
+     "width": 200
+    },
+    {
+     "colId": "sellerId",
+     "width": 200
+    },
+    {
+     "colId": "status",
+     "width": 200
+    },
+    {
+     "colId": "voidReason",
+     "width": 200
+    },
+    {
+     "colId": "priceMicros",
+     "width": 200
+    },
+    {
+     "colId": "createdAt",
+     "width": 200
+    },
+    {
+     "colId": "taskId",
+     "width": 200
+    },
+    {
+     "colId": "agentId",
+     "width": 200
+    },
+    {
+     "colId": "path",
+     "width": 200
+    },
+    {
+     "colId": "latencyMs",
+     "width": 200
+    }
+   ]
+  },
+  "columnOrder": {
+   "orderedColIds": [
+    "id",
+    "sellerId",
+    "status",
+    "voidReason",
+    "priceMicros",
+    "createdAt",
+    "taskId",
+    "agentId",
+    "path",
+    "latencyMs"
+   ]
+  },
+  "rowGroupExpansion": {
+   "expandedRowGroupIds": [],
+   "collapsedRowGroupIds": []
+  },
+  "pagination": {
+   "page": 0,
+   "pageSize": 100
+  }
+ },
+ "filteredState": {
+  "version": "36.3.0",
+  "sideBar": {
+   "visible": false,
+   "openToolPanel": null,
+   "toolPanels": {}
+  },
+  "sort": {
+   "sortModel": [
+    {
+     "colId": "createdAt",
+     "sort": "desc",
+     "type": "default"
+    }
+   ]
+  },
+  "rowGroup": {
+   "groupColIds": [
+    "sellerId"
+   ]
+  },
+  "aggregation": {
+   "aggregationModel": [
+    {
+     "colId": "priceMicros",
+     "aggFunc": "sum"
+    }
+   ]
+  },
+  "columnVisibility": {
+   "hiddenColIds": [
+    "sellerId"
+   ]
+  },
+  "columnSizing": {
+   "columnSizingModel": [
+    {
+     "colId": "ag-Grid-AutoColumn",
+     "width": 200
+    },
+    {
+     "colId": "id",
+     "width": 200
+    },
+    {
+     "colId": "sellerId",
+     "width": 200
+    },
+    {
+     "colId": "status",
+     "width": 200
+    },
+    {
+     "colId": "voidReason",
+     "width": 200
+    },
+    {
+     "colId": "priceMicros",
+     "width": 200
+    },
+    {
+     "colId": "createdAt",
+     "width": 200
+    },
+    {
+     "colId": "taskId",
+     "width": 200
+    },
+    {
+     "colId": "agentId",
+     "width": 200
+    },
+    {
+     "colId": "path",
+     "width": 200
+    },
+    {
+     "colId": "latencyMs",
+     "width": 200
+    }
+   ]
+  },
+  "columnOrder": {
+   "orderedColIds": [
+    "ag-Grid-AutoColumn",
+    "id",
+    "sellerId",
+    "status",
+    "voidReason",
+    "priceMicros",
+    "createdAt",
+    "taskId",
+    "agentId",
+    "path",
+    "latencyMs"
+   ]
+  },
+  "filter": {
+   "filterModel": {
+    "status": {
+     "filterType": "set",
+     "values": [
+      "voided"
+     ]
+    }
+   }
+  },
+  "rowGroupExpansion": {
+   "expandedRowGroupIds": [],
+   "collapsedRowGroupIds": []
+  },
+  "pagination": {
+   "page": 0,
+   "pageSize": 100
+  }
+ }
+}
