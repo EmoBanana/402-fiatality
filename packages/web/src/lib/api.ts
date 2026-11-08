@@ -5,8 +5,9 @@
  *   const tabs = await api.tabs.list();
  *   try { await api.tabs.close(id) } catch (e) { if (e instanceof ApiError) toast(e.message) }
  *
- * Failures throw ApiError (status 0 = gateway unreachable). Mutating calls send `x-p402-admin` when an
- * admin token is stored (only needed when DEMO_MODE=0).
+ * Failures throw ApiError (status 0 = gateway unreachable, including the dev proxy's empty 502; see
+ * `isGatewayDown`). Mutating calls send `x-p402-admin` when an admin token is stored (only needed when
+ * DEMO_MODE=0).
  */
 import type {
   AgentKeyRegisterDTO,
@@ -65,6 +66,11 @@ export class ApiError extends Error {
     this.code = code;
     this.details = details;
   }
+}
+
+/** True when the gateway could not be reached at all (not running, or the dev proxy has nothing to talk to). */
+export function isGatewayDown(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 0;
 }
 
 const ADMIN_TOKEN_KEY = "p402.adminToken";
@@ -134,6 +140,10 @@ export async function request<T>(method: "GET" | "POST" | "PATCH", path: string,
     data = undefined;
   }
   if (!res.ok) {
+    // The Vite dev proxy answers 502 with an empty body when the gateway isn't running: same as unreachable.
+    if (data === undefined && res.status >= 502 && res.status <= 504) {
+      throw new ApiError(0, "network_error", "Can't reach the gateway. Is `npm run dev` running?");
+    }
     const e = (data ?? {}) as Partial<ApiErrorDTO>;
     throw new ApiError(res.status, e.error ?? `http_${res.status}`, e.message ?? (res.statusText || "Request failed"), e.details);
   }

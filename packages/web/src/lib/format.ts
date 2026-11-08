@@ -4,6 +4,8 @@
  * Pass the gateway clock's `now` (useLatestEvent("clock.advanced") / api.clock.get()) when the demo clock
  * may be fast-forwarded.
  */
+import { dollarsToMicros, type Micros, microsToDollarString, VOID_REASON_LABELS } from "@p402/shared";
+
 export {
   centsToMicros,
   effectiveRatePct,
@@ -91,4 +93,35 @@ export function modelLabel(model: string): string {
   const match = /^gemma(\d+)(?::(.+))?$/i.exec(model);
   if (!match) return model;
   return match[2] ? `Gemma ${match[1]} · ${match[2]}` : `Gemma ${match[1]}`;
+}
+
+/** "1 call", "3 calls"; pass `many` for irregular plurals. Counts are formatted (1,204 calls). */
+export function plural(n: number, one: string, many = `${one}s`): string {
+  return `${formatCount(n)} ${n === 1 ? one : many}`;
+}
+
+/**
+ * Parse what a person typed into a dollar field ("0.005", "$1,250", "50") into micros. Returns null for
+ * empty, malformed or negative input; digits past the 6th decimal are dropped.
+ */
+export function parseDollars(input: string): Micros | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  try {
+    const micros = dollarsToMicros(trimmed);
+    return micros < 0 ? null : micros;
+  } catch {
+    return null;
+  }
+}
+
+/** Micros as an editable dollar string: 50_000_000 -> "50.00", 5_000 -> "0.005". */
+export function microsToInput(micros: Micros): string {
+  return microsToDollarString(micros);
+}
+
+/** Readable label for a void reason (falls back to the raw code). */
+export function voidReasonLabel(reason: string | null | undefined): string {
+  if (!reason) return "Voided";
+  return (VOID_REASON_LABELS as Record<string, string>)[reason] ?? reason.replace(/_/g, " ");
 }
