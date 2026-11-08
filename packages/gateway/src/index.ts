@@ -1,4 +1,5 @@
 /** Gateway entry point (`npm run dev` runs it with tsx watch from packages/gateway). */
+import { warmUp } from "@p402/ai";
 import { recoverInterruptedRuns } from "./agents/runs";
 import { APP_VERSION, ConfigError, loadConfig, loadDotEnv, type AppConfig } from "./config";
 import { createContext } from "./context";
@@ -47,6 +48,10 @@ async function main(): Promise<void> {
     `402 Fiatality gateway ${APP_VERSION} on ${config.publicBaseUrl} · web ${config.serveWeb ? config.publicBaseUrl : config.webBaseUrl} · ` +
       `PayPal ${config.paypal.mode} · LLM ${ctx.ai.llm.provider} (${ctx.ai.llm.model}) · ${config.demo ? "demo mode" : "admin token required"}`,
   );
+  // Load the local model now so the first AI review doesn't spend its 45 s budget on a cold start.
+  if (ctx.ai.llm.provider !== "mock") {
+    void warmUp(ctx.ai.llm).then((ready) => log.info(ready ? `${ctx.ai.llm.model} is loaded` : `${ctx.ai.llm.model} did not warm up; check ollama`));
+  }
 
   let stopping = false;
   const shutdown = async (signal: NodeJS.Signals) => {
