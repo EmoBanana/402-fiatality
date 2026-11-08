@@ -1,0 +1,38 @@
+{
+  "name": "@p402/gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "x402 paywall, ledger, policies, alarms, PayPal settlement, REST API and WebSocket feed.",
+  "exports": {
+    "./context": "./src/context.ts",
+    "./config": "./src/config.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/index.ts",
+    "start": "NODE_ENV=production tsx src/index.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.4.1",
+    "@fastify/helmet": "^13.2.0",
+    "@fastify/rate-limit": "^11.2.2",
+    "@fastify/static": "^10.1.10",
+    "@fastify/websocket": "^11.3.7",
+    "@p402/agent": "*",
+    "@p402/ai": "*",
+    "@p402/sellers": "*",
+    "@p402/shared": "*",
+    "@paypal/paypal-server-sdk": "^2.5.0",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "better-sqlite3": "^13.0.3",
+    "fastify": "^5.12.8",
+    "pino": "^10.4.0",
+    "pino-pretty": "^13.2.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0"
+  }
+}
