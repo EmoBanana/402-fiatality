@@ -234,6 +234,12 @@ describe("settlement API", () => {
       payload: { tabId, title: "x", amountCents: 100, researchCostMicros: 0, productUrl: "javascript:alert(1)" },
     });
     expect(badUrl.statusCode).toBe(400);
+    const htmlImage = await app.inject({
+      method: "POST",
+      url: "/api/purchases",
+      payload: { tabId, title: "x", amountCents: 100, researchCostMicros: 0, imageUrl: "data:text/html,<script>alert(1)</script>" },
+    });
+    expect(htmlImage.statusCode).toBe(400);
 
     const created = await app.inject({
       method: "POST",
@@ -263,5 +269,14 @@ describe("settlement API", () => {
     expect(returned.body).toContain(`/console?tab=${tabId}`);
     expect((await app.inject({ method: "GET", url: "/api/purchases" })).json<PurchaseDTO[]>()[0]?.status).toBe("captured");
     expect((await app.inject({ method: "POST", url: "/api/purchases/pur_missing/checkout" })).statusCode).toBe(404);
+
+    // The demo catalog's product images are inline SVG tiles.
+    const inlineImage = await app.inject({
+      method: "POST",
+      url: "/api/purchases",
+      payload: { tabId, title: "Espresso machine", amountCents: 17_900, researchCostMicros: 50_000, imageUrl: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'/>" },
+    });
+    expect(inlineImage.statusCode).toBe(201);
+    expect(inlineImage.json<PurchaseDTO>().imageUrl).toMatch(/^data:image\/svg\+xml/);
   });
 });

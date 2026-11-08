@@ -18,6 +18,8 @@ const id = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, "Invalid id");
 /** PayPal order ids (17 uppercase alphanumerics) and mock ids (MOCK-ORDER-...). */
 const orderToken = z.string().regex(/^[A-Za-z0-9-]{1,64}$/, "Invalid PayPal token");
 const httpUrl = z.url({ protocol: /^https?$/ }).max(2_048);
+/** Product image: an http(s) URL, or a small inline image (the demo catalog ships SVG tiles as data: URIs). */
+const imageUrl = z.union([httpUrl, z.string().max(16_384).regex(/^data:image\/(png|jpeg|gif|webp|svg\+xml)[;,]/)]);
 
 const idParams = z.object({ id });
 const returnQuery = z.object({ kind: z.enum(["tab", "purchase", "check"]), ref: id, token: orderToken });
@@ -38,7 +40,7 @@ const purchaseBody = z.object({
   amountCents: z.number().int().min(1).max(1_000_000),
   merchant: z.string().trim().min(1).max(127).optional(),
   productUrl: httpUrl.optional(),
-  imageUrl: httpUrl.optional(),
+  imageUrl: imageUrl.optional(),
   researchCostMicros: z.number().int().min(0).max(1_000_000_000_000),
   reasoning: z.string().trim().max(4_000).optional(),
 });
