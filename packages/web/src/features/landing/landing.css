@@ -1,0 +1,633 @@
+/* Landing page (pages/Landing.tsx). Prefix `lp-`. Reads tokens only. Designed from 375 px up. */
+
+.lp {
+  --lp-gutter: var(--space-3);
+}
+
+.lp-wrap {
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 0 var(--lp-gutter);
+}
+
+/* ------------------------------------------------------------ hero */
+
+.lp-hero {
+  padding: var(--space-12) 0 calc(var(--space-12) + var(--space-2));
+}
+
+.lp-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  align-items: center;
+  gap: var(--space-10);
+}
+
+/* The hero is an HTTP response: status line, a header, a blank line, then the body (the tagline). */
+.lp-response {
+  font-family: var(--font-mono);
+  font-feature-settings: normal;
+  min-width: 0;
+}
+
+.lp-status {
+  font-size: var(--text-20);
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.lp-status-proto {
+  color: var(--muted);
+}
+
+.lp-status-code {
+  color: var(--accent);
+  font-weight: var(--weight-semibold);
+}
+
+.lp-status-reason b {
+  font-weight: 700;
+}
+
+.lp-header-line {
+  margin-top: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-12);
+  color: var(--muted);
+}
+
+.lp-header-line span {
+  color: var(--ink-2);
+}
+
+.lp-title {
+  margin-top: var(--space-5);
+  font-size: var(--text-56);
+  font-weight: 620;
+  line-height: 1.02;
+  letter-spacing: -0.038em;
+}
+
+.lp-title span {
+  display: block;
+}
+
+.lp-lede {
+  margin-top: var(--space-3);
+  max-width: 34em;
+  font-size: var(--text-20);
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+  color: var(--ink-2);
+}
+
+.lp-ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: var(--space-4);
+}
+
+.lp-hero-note {
+  margin-top: var(--space-2);
+  font-size: var(--text-13);
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------ the IOU tape */
+
+.lp-tape {
+  margin: 0;
+  padding: 20px var(--space-3) var(--space-3);
+  background: var(--surface);
+  border: var(--border);
+  border-radius: var(--radius-card);
+  font-family: var(--font-mono);
+  font-size: var(--text-12);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: normal;
+  color: var(--ink-2);
+}
+
+.lp-tape-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-bottom: 12px;
+  border-bottom: var(--border);
+  font-size: var(--text-12);
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+
+.lp-tape-cols,
+.lp-tape-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px 76px;
+  gap: var(--space-2);
+  align-items: baseline;
+}
+
+.lp-tape-cols {
+  padding: 12px 0 6px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  font-size: 11px;
+}
+
+.lp-tape-cols span:not(:first-child),
+.lp-tape-price,
+.lp-tape .lp-tape-cum {
+  text-align: right;
+}
+
+.lp-tape-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.lp-tape-line {
+  padding: 5px 0;
+}
+
+.lp-tape-call {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.lp-tape-seller {
+  color: var(--ink);
+}
+
+.lp-tape-price {
+  color: var(--ink);
+}
+
+.lp-tape-line .lp-tape-cum {
+  color: var(--muted);
+}
+
+.lp-tape-void {
+  display: block;
+  margin-top: 1px;
+  color: var(--danger);
+}
+
+.lp-tape-line[data-void="true"] .lp-tape-price {
+  color: var(--danger);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.lp-tape-line[data-void="true"] .lp-tape-price .ui-money-sub {
+  color: inherit;
+}
+
+.lp-tape-more {
+  padding: 10px 0 8px;
+  color: var(--muted);
+}
+
+.lp-tape-totals {
+  margin: 4px 0 0;
+}
+
+.lp-tape-totals > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 4px 0;
+}
+
+.lp-tape-totals dt,
+.lp-tape-totals dd {
+  margin: 0;
+}
+
+.lp-tape-sum {
+  padding-top: 10px !important;
+  border-top: var(--rule-single);
+  color: var(--ink);
+}
+
+.lp-tape-meta {
+  color: var(--muted);
+}
+
+.lp-tape-grand {
+  padding-top: 8px !important;
+  padding-bottom: 10px !important;
+  color: var(--ink);
+  font-size: var(--text-14);
+  font-weight: var(--weight-semibold);
+}
+
+.lp-tape-grand dd {
+  padding-bottom: 3px;
+  border-bottom: var(--rule-double);
+}
+
+.lp-tape-aside {
+  color: var(--muted);
+}
+
+/* Lines print in once, top to bottom. */
+.lp-tape-line,
+.lp-tape-more,
+.lp-tape-totals {
+  animation: lp-print 420ms var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 120ms + 240ms);
+}
+
+@keyframes lp-print {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+
+/* ------------------------------------------------------------ sections */
+
+.lp-section {
+  padding: var(--space-12) 0;
+  border-top: var(--border);
+}
+
+.lp-section-head {
+  max-width: 760px;
+  margin-bottom: var(--space-6);
+}
+
+.lp-section-head h2,
+.lp-sellers-copy h2 {
+  margin-top: var(--space-2);
+  font-size: var(--text-40);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+}
+
+.lp-section-lede {
+  margin-top: var(--space-2);
+  max-width: 60ch;
+  font-size: var(--text-16);
+  color: var(--ink-2);
+}
+
+/* ------------------------------------------------------------ how it works */
+
+.lp-steps {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid var(--hairline-strong);
+}
+
+.lp-step {
+  position: relative;
+  padding: var(--space-3) var(--space-4) 0 0;
+}
+
+/* A tick where each step starts on the line: the steps happen in this order. */
+.lp-step::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: 0;
+  width: 1px;
+  height: 9px;
+  background: var(--ink-2);
+}
+
+.lp-step-when {
+  font-family: var(--font-mono);
+  font-size: var(--text-12);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.lp-step h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: var(--space-1);
+  font-size: var(--text-20);
+}
+
+.lp-step-n {
+  font-family: var(--font-mono);
+  font-size: var(--text-13);
+  font-weight: var(--weight-medium);
+  color: var(--muted);
+}
+
+.lp-step p:last-child {
+  margin-top: var(--space-1);
+  max-width: 34ch;
+  color: var(--ink-2);
+}
+
+/* ------------------------------------------------------------ the math */
+
+.lp-table-wrap {
+  border-top: 1px solid var(--hairline-strong);
+}
+
+.lp-math-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-14);
+}
+
+.lp-math-table th,
+.lp-math-table td {
+  padding: 16px var(--space-3) 16px 0;
+  text-align: left;
+  vertical-align: baseline;
+  border-bottom: var(--border);
+}
+
+.lp-math-table th:last-child,
+.lp-math-table td:last-child {
+  padding-right: 0;
+}
+
+.lp-math-table thead th {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  font-size: var(--text-12);
+  font-weight: var(--weight-medium);
+  color: var(--muted);
+}
+
+.lp-math-table tbody th {
+  width: 36%;
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+}
+
+.lp-math-table td {
+  color: var(--ink-2);
+}
+
+.lp-math-table .is-num {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: normal;
+  white-space: nowrap;
+}
+
+.lp-math-table tbody tr:nth-child(2) .is-num {
+  color: var(--danger);
+}
+
+.lp-math-win th,
+.lp-math-win td {
+  color: var(--ink) !important;
+  font-weight: var(--weight-semibold);
+  border-top: var(--rule-single);
+  border-bottom: var(--rule-double) !important;
+}
+
+.lp-footnote {
+  margin-top: var(--space-2);
+  max-width: 80ch;
+  font-size: var(--text-13);
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------ for sellers */
+
+.lp-sellers {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
+  gap: var(--space-10);
+  align-items: center;
+}
+
+.lp-sellers-copy .lp-section-lede {
+  margin-bottom: var(--space-3);
+}
+
+.lp-slip {
+  padding: var(--space-3);
+  background: var(--surface);
+  border: var(--border);
+  border-radius: var(--radius-card);
+}
+
+.lp-slip-title {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: var(--border);
+  font-size: var(--text-13);
+  color: var(--muted);
+}
+
+.lp-slip .ui-ledger {
+  font-size: var(--text-13);
+}
+
+/* ------------------------------------------------------------ built with */
+
+.lp-built {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.lp-built-list {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.lp-built-list dt {
+  font-size: var(--text-16);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.lp-built-list dd {
+  margin: 4px 0 0;
+  font-size: var(--text-13);
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------ footer */
+
+.lp-footer {
+  padding: var(--space-4) 0 var(--space-5);
+  border-top: var(--border);
+  font-size: var(--text-13);
+  color: var(--muted);
+}
+
+.lp-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.lp-footer-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.lp-footer-nav a {
+  color: var(--muted);
+}
+
+.lp-footer-nav a:hover {
+  color: var(--ink);
+}
+
+/* ------------------------------------------------------------ responsive */
+
+@media (max-width: 1080px) {
+  .lp-hero-grid {
+    gap: var(--space-6);
+  }
+  .lp-built {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+}
+
+@media (max-width: 960px) {
+  .lp-hero {
+    padding: var(--space-8) 0 var(--space-10);
+  }
+  .lp-hero-grid,
+  .lp-sellers {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lp-tape {
+    max-width: 560px;
+  }
+  .lp-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: var(--space-5);
+    border-top: 0;
+  }
+  .lp-step {
+    border-top: 1px solid var(--hairline-strong);
+  }
+  .lp-built-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .lp {
+    --lp-gutter: var(--space-2);
+  }
+  .lp-hero {
+    padding: var(--space-5) 0 var(--space-8);
+  }
+  .lp-status {
+    font-size: var(--text-16);
+  }
+  .lp-title {
+    margin-top: var(--space-4);
+    font-size: var(--text-40);
+    line-height: 1.04;
+  }
+  .lp-lede {
+    font-size: var(--text-16);
+  }
+  .lp-ctas > a {
+    flex: 1 1 auto;
+  }
+  .lp-tape {
+    padding: 16px var(--space-2) var(--space-2);
+  }
+  .lp-tape-cols,
+  .lp-tape-line {
+    grid-template-columns: minmax(0, 1fr) 64px;
+  }
+  .lp-tape .lp-tape-cum {
+    display: none;
+  }
+  .lp-section {
+    padding: var(--space-8) 0;
+  }
+  .lp-section-head {
+    margin-bottom: var(--space-4);
+  }
+  .lp-section-head h2,
+  .lp-sellers-copy h2 {
+    font-size: var(--text-28);
+  }
+  .lp-steps {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-4);
+  }
+  .lp-step {
+    padding-right: 0;
+  }
+  /* The math table becomes one block per scenario. */
+  .lp-math-table thead {
+    display: none;
+  }
+  .lp-math-table tr {
+    display: block;
+    padding: 14px 0;
+    border-bottom: var(--border);
+  }
+  .lp-math-table th,
+  .lp-math-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+    width: auto !important;
+    padding: 3px 0;
+    border: 0 !important;
+    text-align: left;
+  }
+  .lp-math-table td[data-label]::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-family: var(--font-sans);
+    font-weight: var(--weight-regular);
+  }
+  .lp-math-table td:not(.is-num) {
+    display: block;
+  }
+  .lp-math-table td:not(.is-num)::before {
+    display: none;
+  }
+  .lp-math-table tbody th {
+    display: block;
+    padding-bottom: 6px;
+  }
+  .lp-math-win {
+    border-top: var(--rule-single);
+    border-bottom: var(--rule-double) !important;
+  }
+  .lp-built-list {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+  .lp-footer-inner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
