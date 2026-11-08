@@ -58,7 +58,7 @@ async function main(): Promise<void> {
   const tokens = createTokenSource({ baseUrl: PAYPAL_SANDBOX_API, clientId, clientSecret });
   const paypal = createSandboxPaypal({ config, log: pino({ level: "silent" }) }, { tokens });
 
-  console.log(ansi(1, "\nPayPal 402: sandbox check"));
+  console.log(ansi(1, "\n402 Fiatality: sandbox check"));
   console.log(`API ${PAYPAL_SANDBOX_API} · PAYPAL_MODE in .env: ${process.env.PAYPAL_MODE || "mock"}\n`);
 
   const report = await runPaypalCheck({

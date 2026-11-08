@@ -146,7 +146,7 @@ const spendFields: AgFieldDefinition[] = [
 export function buildDataDefinition(rows: StudioRows): AgDataSourcesDefinition {
   return {
     description:
-      "PayPal 402 ledger. AI agents pay per API call with signed IOUs (vouchers) against one PayPal hold per company (a tab). " +
+      "402 Fiatality ledger. AI agents pay per API call with signed IOUs (vouchers) against one PayPal hold per company (a tab). " +
       "Accepted calls are billable; voided calls (seller errors, empty or malformed results, AI review) are never billed. " +
       "Each tab settles with one PayPal charge; per-call fees show what separate PayPal payments would have cost. Amounts are USD.",
     sources: [

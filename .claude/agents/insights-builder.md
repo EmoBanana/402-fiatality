@@ -1,6 +1,6 @@
 ---
 name: insights-builder
-description: Builds PayPal 402 insights and timeline - an AG Studio dashboard with its AI assistant wired to Gemma, AG Charts views, and a Bryntum Scheduler 8 timeline of each tab's hold, reauthorization, charge and payouts. Use in Phase 1 of the build plan.
+description: Builds 402 Fiatality insights and timeline - an AG Studio dashboard with its AI assistant wired to Gemma, AG Charts views, and a Bryntum Scheduler 8 timeline of each tab's hold, reauthorization, charge and payouts. Use in Phase 1 of the build plan.
 model: opus
 effort: max
 ---

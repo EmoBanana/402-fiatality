@@ -22,8 +22,8 @@ const hold = (requestId = "hold-tab_1", amountCents = 5_000) => ({
   referenceId: "tab_1",
   amountCents,
   description: "Agent spending tab",
-  softDescriptor: "PP402 AGENT TAB",
-  brandName: "PayPal 402",
+  softDescriptor: "FIATALITY AGENT TAB",
+  brandName: "402 Fiatality",
   returnUrl: "http://localhost:4020/paypal/return?kind=tab&ref=tab_1",
   cancelUrl: "http://localhost:4020/paypal/cancel?kind=tab&ref=tab_1",
   requestId,
@@ -160,7 +160,7 @@ describe("mock PayPal holds", () => {
       amountCents: 14_900,
       itemName: "Espresso machine",
       description: "Agent purchase",
-      brandName: "PayPal 402",
+      brandName: "402 Fiatality",
       returnUrl: "http://localhost:4020/paypal/return?kind=purchase&ref=pur_1",
       cancelUrl: "http://localhost:4020/paypal/cancel?kind=purchase&ref=pur_1",
       requestId: "checkout-pur_1",
@@ -187,7 +187,7 @@ describe("mock PayPal payouts", () => {
     const batch = await paypal.createPayoutBatch({
       senderBatchId: "po_1",
       emailSubject: "Payout",
-      note: "PayPal 402 weekly payout",
+      note: "402 Fiatality weekly payout",
       items: [
         { senderItemId: "po_1:channel3", receiverEmail: "channel3@example.com", amountCents: 975, note: "n" },
         { senderItemId: "po_1:reviews", receiverEmail: "not-an-email", amountCents: 500, note: "n" },

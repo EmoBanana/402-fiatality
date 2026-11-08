@@ -56,7 +56,7 @@ export function looksLikePartialCaptureDisabled(err: unknown): err is PaypalErro
 export const PARTIAL_CAPTURE_HINT =
   "Partial capture of PayPal-wallet authorizations is not enabled for this sandbox merchant. Ask PayPal (developer " +
   "support or your account team) to enable partial/multiple captures for the account, or try a fresh sandbox " +
-  "business account; until then PayPal 402 can only capture the full hold";
+  "business account; until then 402 Fiatality can only capture the full hold";
 
 export async function runPaypalCheck(deps: CheckDeps): Promise<CheckReport> {
   const { paypal, tokens } = deps;
@@ -104,9 +104,9 @@ export async function runPaypalCheck(deps: CheckDeps): Promise<CheckReport> {
     const order = await paypal.createAuthorizeOrder({
       referenceId: `check_${runId}`,
       amountCents: CHECK_HOLD_CENTS,
-      description: "PayPal 402 sandbox check",
-      softDescriptor: "PP402 CHECK",
-      brandName: "PayPal 402",
+      description: "402 Fiatality sandbox check",
+      softDescriptor: "FIATALITY CHECK",
+      brandName: "402 Fiatality",
       returnUrl: `${deps.publicBaseUrl}/paypal/return?kind=check&ref=check`,
       cancelUrl: `${deps.publicBaseUrl}/paypal/cancel?kind=check&ref=check`,
       requestId: `check-hold-${runId}`,
@@ -141,7 +141,7 @@ export async function runPaypalCheck(deps: CheckDeps): Promise<CheckReport> {
         amountCents: CHECK_CAPTURE_CENTS,
         finalCapture: true,
         invoiceId: `check-${runId}`,
-        noteToPayer: "PayPal 402 sandbox check",
+        noteToPayer: "402 Fiatality sandbox check",
         requestId: `check-capture-${runId}`,
       });
       partialCapture = "ENABLED";
@@ -195,10 +195,10 @@ export async function runPaypalCheck(deps: CheckDeps): Promise<CheckReport> {
   try {
     const batch = await paypal.createPayoutBatch({
       senderBatchId: `check-${runId}`,
-      emailSubject: "PayPal 402 sandbox check",
-      note: "PayPal 402 sandbox check",
+      emailSubject: "402 Fiatality sandbox check",
+      note: "402 Fiatality sandbox check",
       items: [
-        { senderItemId: `check-${runId}:channel3`, receiverEmail: deps.payoutReceiver, amountCents: CHECK_PAYOUT_CENTS, note: "PayPal 402 sandbox check" },
+        { senderItemId: `check-${runId}:channel3`, receiverEmail: deps.payoutReceiver, amountCents: CHECK_PAYOUT_CENTS, note: "402 Fiatality sandbox check" },
       ],
     });
     record("Create payout batch", "PASS", `batch ${batch.batchId} (${batch.status}) for ${formatCents(CHECK_PAYOUT_CENTS)}`);

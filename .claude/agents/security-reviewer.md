@@ -1,6 +1,6 @@
 ---
 name: security-reviewer
-description: Reviews and hardens PayPal 402 - payment-flow attacks (replay, double spend, signature, amount tampering), SSRF, secrets, injection, prompt injection in the AI review, dependency CVEs. Use in Phase 4 of the build plan.
+description: Reviews and hardens 402 Fiatality - payment-flow attacks (replay, double spend, signature, amount tampering), SSRF, secrets, injection, prompt injection in the AI review, dependency CVEs. Use in Phase 4 of the build plan.
 model: opus
 effort: max
 ---

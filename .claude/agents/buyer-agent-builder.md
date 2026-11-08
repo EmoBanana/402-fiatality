@@ -1,6 +1,6 @@
 ---
 name: buyer-agent-builder
-description: Builds the PayPal 402 buyer side and demo sellers - the x402 client with cumulative signed IOUs, the price-aware Gemma shopping agent (llm, scripted and runaway modes), the CLI, and the demo seller APIs (Channel3-shaped catalog, price history, flaky reviews). Use in Phase 1 of the build plan.
+description: Builds the 402 Fiatality buyer side and demo sellers - the x402 client with cumulative signed IOUs, the price-aware Gemma shopping agent (llm, scripted and runaway modes), the CLI, and the demo seller APIs (Channel3-shaped catalog, price history, flaky reviews). Use in Phase 1 of the build plan.
 model: opus
 effort: max
 ---

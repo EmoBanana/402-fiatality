@@ -1,6 +1,6 @@
 ---
 name: terminal-builder
-description: Builds the PayPal 402 clearing terminal with AG Grid Enterprise - live IOU stream, voids, grouping and aggregation, sparklines, master-detail AI review transcripts, settlements, and natural-language "Ask the ledger" via the AG Grid AI Toolkit. The AG Grid sponsor showcase. Use in Phase 1 of the build plan.
+description: Builds the 402 Fiatality clearing terminal with AG Grid Enterprise - live IOU stream, voids, grouping and aggregation, sparklines, master-detail AI review transcripts, settlements, and natural-language "Ask the ledger" via the AG Grid AI Toolkit. The AG Grid sponsor showcase. Use in Phase 1 of the build plan.
 model: opus
 effort: max
 ---

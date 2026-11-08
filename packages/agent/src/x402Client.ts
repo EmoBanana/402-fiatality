@@ -1,5 +1,5 @@
 /**
- * x402 client for the PayPal 402 gateway (SPEC §8.1): the PayPal binding of the `batch-settlement` scheme.
+ * x402 client for the 402 Fiatality gateway (SPEC §8.1): the PayPal binding of the `batch-settlement` scheme.
  *
  * Every paid call carries one signed IOU (`PAYMENT-SIGNATURE`) whose `cumulative` is the running total owed to
  * that seller on the tab. Prices come from GET /api/catalog, so a known endpoint is paid on the first request

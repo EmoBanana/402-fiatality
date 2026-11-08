@@ -1,6 +1,6 @@
 ---
 name: design-reviewer
-description: Design QA for PayPal 402 - screenshots every page in light and dark mode, fixes spacing, typography, alignment, contrast and empty states so the app looks minimal and classy. Use in Phase 4 of the build plan.
+description: Design QA for 402 Fiatality - screenshots every page in light and dark mode, fixes spacing, typography, alignment, contrast and empty states so the app looks minimal and classy. Use in Phase 4 of the build plan.
 model: opus
 effort: max
 ---

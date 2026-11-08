@@ -1,6 +1,6 @@
 ---
 name: paypal-builder
-description: Builds PayPal integration for PayPal 402 - holds (AUTHORIZE orders), reauthorization, capture with fee split, payouts, retail purchase checkout, statements, the lifecycle scheduler, a mock PayPal and the check-paypal script. Use in Phase 1 of the build plan.
+description: Builds PayPal integration for 402 Fiatality - holds (AUTHORIZE orders), reauthorization, capture with fee split, payouts, retail purchase checkout, statements, the lifecycle scheduler, a mock PayPal and the check-paypal script. Use in Phase 1 of the build plan.
 model: opus
 effort: max
 ---

@@ -1,5 +1,5 @@
 /**
- * AppContext (dependency injection) and the contracts between the PayPal 402 packages.
+ * AppContext (dependency injection) and the contracts between the 402 Fiatality packages.
  *
  * Implementations (SPEC §2):
  *   PaypalClient, SettlementService -> packages/gateway/src/paypal/**, src/settlement/**   (paypal-builder)

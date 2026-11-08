@@ -107,7 +107,7 @@ export function returnPage(opts: { message: PaypalReturnMessage; consoleUrl: str
   const copy = RETURN_COPY[message.kind][message.status];
   const tone = message.status === "approved" ? "ok" : message.status === "failed" ? "bad" : "";
   const origins = [...new Set(opts.origins.map(originOf).filter((o): o is string => o !== null))];
-  const body = `<p class="kicker">PayPal 402</p>
+  const body = `<p class="kicker">402 Fiatality</p>
 <h1 class="${tone}">${escapeHtml(copy.title)}</h1>
 <p>${escapeHtml(copy.text)}</p>
 ${message.message ? `<p>${escapeHtml(message.message)}</p>` : ""}
@@ -122,7 +122,7 @@ setTimeout(function(){try{window.close();}catch(e){}},${message.status === "fail
 export function checkReturnPage(status: "approved" | "cancelled"): HtmlPage {
   const nonce = randomBytes(16).toString("base64");
   const title = status === "approved" ? "Approved" : "Cancelled";
-  const body = `<p class="kicker">PayPal 402 sandbox check</p>
+  const body = `<p class="kicker">402 Fiatality sandbox check</p>
 <h1 class="${status === "approved" ? "ok" : "bad"}">${title}</h1>
 <p>Go back to the terminal running <code>npm run check:paypal</code> and press Enter.</p>`;
   return { html: layout(`Sandbox check: ${title}`, body, nonce), csp: csp(nonce, "'none'") };
@@ -131,7 +131,7 @@ export function checkReturnPage(status: "approved" | "cancelled"): HtmlPage {
 /** A plain message page (bad links, unknown orders). */
 export function messagePage(title: string, text: string): HtmlPage {
   const nonce = randomBytes(16).toString("base64");
-  const body = `<p class="kicker">PayPal 402</p><h1>${escapeHtml(title)}</h1><p>${escapeHtml(text)}</p>`;
+  const body = `<p class="kicker">402 Fiatality</p><h1>${escapeHtml(title)}</h1><p>${escapeHtml(text)}</p>`;
   return { html: layout(title, body, nonce), csp: csp(nonce, "'none'") };
 }
 

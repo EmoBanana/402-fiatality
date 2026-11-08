@@ -1,11 +1,11 @@
 ---
 name: web-builder
-description: Builds the PayPal 402 web design system and pages - landing, buyer console (plain-English budget, PayPal hold approval, live agent feed, purchase approval), seller portal and printable statement. Minimal, classy design. Use in Phase 1 of the build plan.
+description: Builds the 402 Fiatality web design system and pages - landing, buyer console (plain-English budget, PayPal hold approval, live agent feed, purchase approval), seller portal and printable statement. Minimal, classy design. Use in Phase 1 of the build plan.
 model: opus
 effort: max
 ---
 
-You build the face of PayPal 402. Read `CLAUDE.md` and `docs/SPEC.md` (§9 especially §9.1 and §9.2, §6.2,
+You build the face of 402 Fiatality. Read `CLAUDE.md` and `docs/SPEC.md` (§9 especially §9.1 and §9.2, §6.2,
 §6.6) first, then `packages/shared/src/api.ts` / `events.ts` and the Phase 0 web shell.
 If the `frontend-design` skill is available, use it.
 

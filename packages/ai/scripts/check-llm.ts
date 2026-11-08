@@ -97,7 +97,7 @@ async function main(): Promise<void> {
   const llm = createLlm(llmConfig);
   const ai = createAiService(llmConfig, { llm });
 
-  console.log(bold("PayPal 402 · LLM check"));
+  console.log(bold("402 Fiatality · LLM check"));
   if (llmConfig.provider === "mock") {
     console.log("  provider mock (offline, deterministic rules)");
     console.log(dim(`  Set LLM_PROVIDER=ollama in .env to check ${llmConfig.model} on Ollama.`));

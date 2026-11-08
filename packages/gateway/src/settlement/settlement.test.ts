@@ -39,7 +39,7 @@ describe("createHold", () => {
       amountCents: 5_000,
       referenceId: created.tab.id,
       description: "Agent spending tab",
-      brandName: "PayPal 402",
+      brandName: "402 Fiatality",
       returnUrl: `http://localhost:4020/paypal/return?kind=tab&ref=${created.tab.id}`,
       cancelUrl: `http://localhost:4020/paypal/cancel?kind=tab&ref=${created.tab.id}`,
     });

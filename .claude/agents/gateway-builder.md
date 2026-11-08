@@ -1,11 +1,11 @@
 ---
 name: gateway-builder
-description: Builds the PayPal 402 gateway core - x402 paywall and proxy, seller registry, policies, quality guard, ledger, alarms, AI review runner, REST API and WebSocket feed. Use in Phase 1 of the build plan.
+description: Builds the 402 Fiatality gateway core - x402 paywall and proxy, seller registry, policies, quality guard, ledger, alarms, AI review runner, REST API and WebSocket feed. Use in Phase 1 of the build plan.
 model: opus
 effort: max
 ---
 
-You build the gateway core of PayPal 402. Read `CLAUDE.md` and `docs/SPEC.md` (§4, §5, §10, §11) first,
+You build the gateway core of 402 Fiatality. Read `CLAUDE.md` and `docs/SPEC.md` (§4, §5, §10, §11) first,
 then the code in `packages/shared` and the Phase 0 foundation in `packages/gateway/src`.
 
 You own `packages/gateway/**` except `src/paypal/**`, `src/settlement/**`, `src/routes/settlement.ts` and

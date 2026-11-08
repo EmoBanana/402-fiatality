@@ -1,4 +1,4 @@
--- PayPal 402 ledger (SPEC §4). Applied by db.ts on open; every statement must stay idempotent.
+-- 402 Fiatality ledger (SPEC §4). Applied by db.ts on open; every statement must stay idempotent.
 -- Money columns are integer micro-dollars unless the name ends in _cents. Times are epoch ms (gateway clock).
 -- JSON columns hold TEXT. Bump SCHEMA_VERSION in db.ts whenever a table changes.
 

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "PayPal 402 dashboard: landing, console, terminal, sellers, insights, timeline.",
+  "description": "402 Fiatality dashboard: landing, console, terminal, sellers, insights, timeline.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

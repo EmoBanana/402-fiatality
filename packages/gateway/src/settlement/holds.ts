@@ -30,8 +30,8 @@ import {
 } from "./store";
 
 export const HOLD_DESCRIPTION = "Agent spending tab";
-export const SOFT_DESCRIPTOR = "PP402 AGENT TAB";
-export const BRAND_NAME = "PayPal 402";
+export const SOFT_DESCRIPTOR = "FIATALITY AGENT TAB";
+export const BRAND_NAME = "402 Fiatality";
 
 /** PayPal: the hold is honored for 3 days, reauthorized once (day 4), valid 29 days. */
 export const HONOR_PERIOD_MS = 3 * DAY_MS;

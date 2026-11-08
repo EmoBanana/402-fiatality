@@ -1,4 +1,6 @@
-# PayPal 402 — Build Spec
+# 402 Fiatality — Build Spec
+
+User-facing name: **402 Fiatality** (internal package scope stays `@p402`).
 
 HTTP 402 micropayments for AI agents on PayPal. A company opens one PayPal hold ("tab"),
 its agents sign an IOU per paid API call, a gateway checks each IOU locally and pays the
@@ -46,7 +48,7 @@ x402 types, vouchers, DTOs, events) with tests — read it before building anyth
 ### Competitive positioning (for README / video)
 Stripe+Tempo MPP sessions (Mar 2026, on-chain escrow), Mastercard Agent Pay for Machines (early access
 Oct 2026, vouchers settled later via BVNK/Base), Cloudflare Monetization Gateway (stablecoins) all do
-"authorize once, settle later" on stablecoins. PayPal 402 does it on a PayPal hold: no wallet, no
+"authorize once, settle later" on stablecoins. 402 Fiatality does it on a PayPal hold: no wallet, no
 stablecoin, ~440M PayPal accounts, void-before-capture protection, and PayPal disputes on the one charge.
 
 ---
@@ -282,9 +284,9 @@ Map PayPal errors to typed errors (name, debug_id, details) and log `debug_id`.
 
 ### 6.2 Opening a tab (hold)
 1. `createHold(tab)`: Orders v2 create, `intent: "AUTHORIZE"`, one purchase unit: amount = holdCents,
-   `reference_id`/`custom_id` = tab id, description "Agent spending tab", `soft_descriptor` "PP402 AGENT TAB",
+   `reference_id`/`custom_id` = tab id, description "Agent spending tab", `soft_descriptor` "FIATALITY AGENT TAB",
    `payment_source.paypal.experience_context`: `return_url` `${PUBLIC_BASE_URL}/paypal/return?kind=tab&ref=<tab>`,
-   `cancel_url` similar, `user_action: "CONTINUE"`, `shipping_preference: "NO_SHIPPING"`, `brand_name: "PayPal 402"`.
+   `cancel_url` similar, `user_action: "CONTINUE"`, `shipping_preference: "NO_SHIPPING"`, `brand_name: "402 Fiatality"`.
    Return the `payer-action` link as `approveUrl`.
 2. The console opens `approveUrl` in a popup. PayPal redirects to `/paypal/return?...&token=ORDER_ID`.
 3. Return handler: `authorize` the order → store authorization id, `authorized_at`, `honor_until` (+3 d),
@@ -321,7 +323,7 @@ In one DB transaction where possible:
 ### 6.5 Payouts — `runPayouts(thresholdCents = 1000)`
 Sellers with available ≥ threshold: amount = floor to cents − 25¢ fee. One batch
 (`sender_batch_header.sender_batch_id` = payout id, `recipient_type: EMAIL`, `receiver` = seller PayPal email,
-`note` "PayPal 402 weekly payout"). Debit balances (available −= amount + fee, paid_out += amount).
+`note` "402 Fiatality weekly payout"). Debit balances (available −= amount + fee, paid_out += amount).
 Poll batch status (mock: immediate success). Emit `payout.completed`. Demo UI allows a lower threshold.
 
 ### 6.6 Agent retail purchase (the finale)
@@ -420,13 +422,13 @@ Each requires `x-api-key: demo-<id>-key` (shows the gateway injecting seller key
   Tokens as CSS variables; light/dark via `prefers-color-scheme` + a toggle (`data-theme`).
 - Radius 10 (cards) / 8 (inputs) / 999 (pills). 8 px spacing grid. Motion 150–200 ms ease-out.
 - Do not use PayPal's logo or brand colors; use the official PayPal approval page for holds. Simple "402"
-  monogram + "PayPal 402" wordmark. Sponsor names as plain text, no logos.
+  monogram + "402 Fiatality" wordmark (emphasize "Fiat": **Fiat**ality). Sponsor names as plain text, no logos.
 - Components (in `src/components`): AppShell (top nav: Console, Terminal, Sellers, Insights, Timeline +
   mode badges "PayPal sandbox|mock" and "Gemma 4 · 12b"), Button, Input, Textarea, Card, Stat, Badge/Pill,
   Table, EmptyState, Toast, Drawer, Money (formats micros with sub-cent precision).
 
 ### 9.2 Pages
-- **Landing `/`**: hero (tagline, one-sentence subline, CTAs "Open console" / "View terminal"); a 4-step
+- **Landing `/`**: hero styled as a server response line `HTTP/1.1 402 Fiatality` (tagline, one-sentence subline, CTAs "Open console" / "View terminal"); a 4-step
   "how it works" (Hold → IOU per call → AI guard → One charge); "the math" table ($0.005 can't be charged on
   PayPal; 1,000 separate charges ≈ $490 in fees; batched $50 tab ≈ $2.24); "for sellers" (list an API, keep
   ~95%, weekly PayPal payouts); "built with" (PayPal, Gemma 4, AG Grid, Bryntum, Channel3) as text.

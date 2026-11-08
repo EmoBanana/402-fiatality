@@ -1,6 +1,6 @@
 ---
 name: ai-builder
-description: Builds the PayPal 402 AI package on Gemma 4 via Ollama - LLM client with structured outputs, plain-English policy parser, the three-role AI spend review, AG Grid AI Toolkit grid queries, AG Studio chat proxy, mock LLM and check-llm script. Use in Phase 1 of the build plan.
+description: Builds the 402 Fiatality AI package on Gemma 4 via Ollama - LLM client with structured outputs, plain-English policy parser, the three-role AI spend review, AG Grid AI Toolkit grid queries, AG Studio chat proxy, mock LLM and check-llm script. Use in Phase 1 of the build plan.
 model: opus
 effort: max
 ---

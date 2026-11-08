@@ -13,8 +13,8 @@ import { emitSellers, errorFields, type SettlementContext, sleep, withLock } fro
 
 export const DEFAULT_PAYOUT_THRESHOLD_CENTS = 1_000;
 export const PAYOUT_FEE_CENTS = PAYPAL_US_FEES.payoutApiFlatCents;
-const PAYOUT_NOTE = "PayPal 402 weekly payout";
-const PAYOUT_SUBJECT = "You have a payout from PayPal 402";
+const PAYOUT_NOTE = "402 Fiatality weekly payout";
+const PAYOUT_SUBJECT = "You have a payout from 402 Fiatality";
 /** Item statuses where the money did not reach (and will not reach) the seller. */
 const FAILED_ITEM_STATUSES = new Set(["FAILED", "RETURNED", "BLOCKED", "REFUNDED", "REVERSED", "DENIED", "CANCELED", "CANCELLED"]);
 const FINAL_BATCH_STATUSES = new Set(["SUCCESS", "DENIED", "CANCELED", "CANCELLED"]);

@@ -1,5 +1,5 @@
 /**
- * A tiny stand-in for the PayPal 402 gateway, close enough to SPEC §5.3 to exercise the agent: /api/config,
+ * A tiny stand-in for the 402 Fiatality gateway, close enough to SPEC §5.3 to exercise the agent: /api/config,
  * /api/catalog, /api/tabs/:id, /api/tabs/:id/keys, /api/purchases and the x402 paywall at /s/:sellerId/*
  * (verification order and reason codes, seq/cumulative, quality guard, PAYMENT-RESPONSE). Test code only.
  */

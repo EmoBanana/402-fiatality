@@ -15,7 +15,7 @@ import { errorMessage } from "./util";
 
 const USAGE = `Usage: npm run agent -- --tab <tabId> --token <enrollToken> --task "<what to buy>" [options]
 
-Runs the PayPal 402 shopping agent on a tab: it registers a fresh signing key with the tab's enroll token,
+Runs the 402 Fiatality shopping agent on a tab: it registers a fresh signing key with the tab's enroll token,
 pays sellers per call with signed IOUs and prints every step.
 
 Options:
@@ -109,7 +109,7 @@ async function main(): Promise<number> {
   });
 
   const model = llm ? ` · ${llm.provider === "mock" ? "built-in planner" : `${llm.provider} ${llm.model}`}` : "";
-  console.log(paint(1, `PayPal 402 agent ${agentId}`) + paint(2, ` · tab ${tab} · ${mode}${model} · ${gatewayUrl}`));
+  console.log(paint(1, `402 Fiatality agent ${agentId}`) + paint(2, ` · tab ${tab} · ${mode}${model} · ${gatewayUrl}`));
   console.log(paint(2, `Task: ${task}`));
 
   const result = await runAgent({

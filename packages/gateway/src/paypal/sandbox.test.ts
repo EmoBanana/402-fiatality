@@ -85,8 +85,8 @@ const holdInput = {
   referenceId: "tab_abc",
   amountCents: 5_000,
   description: "Agent spending tab",
-  softDescriptor: "PP402 AGENT TAB",
-  brandName: "PayPal 402",
+  softDescriptor: "FIATALITY AGENT TAB",
+  brandName: "402 Fiatality",
   returnUrl: "http://localhost:4020/paypal/return?kind=tab&ref=tab_abc",
   cancelUrl: "http://localhost:4020/paypal/cancel?kind=tab&ref=tab_abc",
   requestId: "hold-tab_abc",
@@ -116,14 +116,14 @@ describe("sandbox PayPal client (Server SDK)", () => {
           reference_id: "tab_abc",
           custom_id: "tab_abc",
           description: "Agent spending tab",
-          soft_descriptor: "PP402 AGENT TAB",
+          soft_descriptor: "FIATALITY AGENT TAB",
           amount: { currency_code: "USD", value: "50.00" },
         },
       ],
       payment_source: {
         paypal: {
           experience_context: {
-            brand_name: "PayPal 402",
+            brand_name: "402 Fiatality",
             return_url: holdInput.returnUrl,
             cancel_url: holdInput.cancelUrl,
             user_action: "CONTINUE",
@@ -143,7 +143,7 @@ describe("sandbox PayPal client (Server SDK)", () => {
       amountCents: 14_900,
       itemName: "Espresso machine",
       description: "Agent purchase after $0.37 of agent research",
-      brandName: "PayPal 402",
+      brandName: "402 Fiatality",
       returnUrl: "http://localhost:4020/paypal/return?kind=purchase&ref=pur_1",
       cancelUrl: "http://localhost:4020/paypal/cancel?kind=purchase&ref=pur_1",
       requestId: "checkout-pur_1",
@@ -292,9 +292,9 @@ describe("sandbox PayPal client (Payouts REST + OAuth)", () => {
     });
     const created = await paypal.createPayoutBatch({
       senderBatchId: "po_1",
-      emailSubject: "You have a payout from PayPal 402",
-      note: "PayPal 402 weekly payout",
-      items: [{ senderItemId: "po_1:channel3", receiverEmail: "c3@example.com", amountCents: 975, note: "PayPal 402 weekly payout" }],
+      emailSubject: "You have a payout from 402 Fiatality",
+      note: "402 Fiatality weekly payout",
+      items: [{ senderItemId: "po_1:channel3", receiverEmail: "c3@example.com", amountCents: 975, note: "402 Fiatality weekly payout" }],
     });
     expect(created).toEqual({
       batchId: "BATCH1",
@@ -310,14 +310,14 @@ describe("sandbox PayPal client (Payouts REST + OAuth)", () => {
       sender_batch_header: {
         sender_batch_id: "po_1",
         recipient_type: "EMAIL",
-        email_subject: "You have a payout from PayPal 402",
-        email_message: "PayPal 402 weekly payout",
+        email_subject: "You have a payout from 402 Fiatality",
+        email_message: "402 Fiatality weekly payout",
       },
       items: [
         {
           recipient_type: "EMAIL",
           amount: { value: "9.75", currency: "USD" },
-          note: "PayPal 402 weekly payout",
+          note: "402 Fiatality weekly payout",
           sender_item_id: "po_1:channel3",
           receiver: "c3@example.com",
         },

@@ -8,7 +8,7 @@ import type { ModeOutcome, RunSession } from "../session";
 
 export async function runRunaway(s: RunSession, maxCalls: number): Promise<ModeOutcome> {
   const { query, maxPriceCents } = s.task;
-  s.thought(`Runaway mode: repeating the search for "${query}" without reading the results, like an agent stuck in a loop. PayPal 402 should catch it.`);
+  s.thought(`Runaway mode: repeating the search for "${query}" without reading the results, like an agent stuck in a loop. 402 Fiatality should catch it.`);
   for (let i = 1; i <= maxCalls; i++) {
     await s.perform("search", { query, maxPriceCents }, i === 1 ? `Search #1 for "${query}"` : `Search #${i} for "${query}" (same request again)`);
   }
