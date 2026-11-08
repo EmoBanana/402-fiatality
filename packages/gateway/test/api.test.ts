@@ -16,6 +16,7 @@ import type {
   TimeseriesPointDTO,
   VoucherDTO,
 } from "@p402/shared";
+import { LlmError } from "@p402/ai";
 import { generateAgentKeyPair } from "@p402/shared/node";
 import { afterEach, describe, expect, it } from "vitest";
 import { createTestContext } from "../src/context";
@@ -326,6 +327,16 @@ describe("ai routes", () => {
     });
     expect(chat.body.choices[0]!.message.content).toBe("echo: hello");
     expect((await injectJson(h.app, "POST", "/api/ai/chat", { messages: [] })).status).toBe(400);
+  });
+
+  it("turns model failures into readable API errors", async () => {
+    h = await createHarness({ withSeller: false });
+    h.ai.chatProxy = async () => {
+      throw new LlmError("unreachable", "Ollama is not running. Start Ollama, then retry.");
+    };
+    const res = await injectJson(h.app, "POST", "/api/ai/chat", { messages: [{ role: "user", content: "hi" }] });
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual({ error: "llm_unreachable", message: "Ollama is not running. Start Ollama, then retry." });
   });
 });
 

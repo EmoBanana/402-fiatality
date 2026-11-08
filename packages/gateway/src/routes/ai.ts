@@ -1,7 +1,8 @@
 /** AG Grid AI Toolkit queries and the OpenAI-style chat proxy used by AG Studio (SPEC §7). */
+import { isLlmError } from "@p402/ai";
 import type { ChatRequestDTO, GridQueryRequestDTO } from "@p402/shared";
 import { z } from "zod";
-import type { RoutePlugin } from "../context";
+import { AppError, type RoutePlugin } from "../context";
 import { parseInput } from "../http/errors";
 
 /** Grid schemas/state and chat histories can be large; still bounded. */
@@ -73,6 +74,12 @@ export const aiRoutes: RoutePlugin = async (app, { ctx }) => {
     reply.raw.on("close", () => {
       if (!reply.raw.writableFinished) controller.abort();
     });
-    return ctx.ai.chatProxy(body, controller.signal);
+    try {
+      return await ctx.ai.chatProxy(body, controller.signal);
+    } catch (err) {
+      // Model trouble (Ollama down, model not pulled, timeout) keeps its status and a readable fix.
+      if (isLlmError(err)) throw new AppError(err.status, `llm_${err.code}`, err.message);
+      throw err;
+    }
   });
 };
