@@ -1,4 +1,5 @@
-import "@fontsource-variable/inter";
+// Inter with the optical-size axis: big headings get the display cut automatically.
+import "@fontsource-variable/inter/opsz.css";
 import "@fontsource-variable/jetbrains-mono";
 import "./styles/tokens.css";
 import "./styles/base.css";

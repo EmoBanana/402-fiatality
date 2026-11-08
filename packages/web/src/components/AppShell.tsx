@@ -1,16 +1,22 @@
 /**
  * App frame: top nav, mode badges ("PayPal sandbox|mock", "Gemma 4 · 12b"), live-connection dot and theme
- * toggle, then the page. Routes opt into full-width layout with `handle: { wide: true }` (terminal,
- * insights, timeline). Mounts <ToastProvider>.
+ * toggle, then the page. Mounts <ToastProvider> and scroll restoration.
+ *
+ * Route handles (router.tsx):
+ *   handle: { wide: true }          full-window width (terminal, insights, timeline)
+ *   handle: { chrome: "landing" }   marketing header without live status, page draws its own sections
+ * Below 900 px the nav and badges fold into a menu button (only the landing page is designed that narrow).
  */
-import type { ConfigDTO } from "@p402/shared";
-import { useEffect, useState } from "react";
-import { NavLink, Outlet, useMatches } from "react-router";
-import { api } from "../lib/api";
+import { useEffect, useId, useState } from "react";
+import { NavLink, Outlet, ScrollRestoration, useLocation, useMatches, useNavigation } from "react-router";
+import { isGatewayDown } from "../lib/api";
+import { useGatewayConfig, useGatewayHealth } from "../lib/config";
 import { useGatewayStatus } from "../lib/events";
 import { modelLabel } from "../lib/format";
-import { type ThemePreference, useTheme } from "../lib/theme";
 import { Badge } from "./Badge";
+import { buttonClassName } from "./Button";
+import { Logo } from "./Logo";
+import { ThemeToggle } from "./ThemeToggle";
 import { ToastProvider } from "./Toast";
 
 export const NAV_LINKS = [
@@ -21,76 +27,163 @@ export const NAV_LINKS = [
   { to: "/timeline", label: "Timeline" },
 ] as const;
 
-const NEXT_THEME: Record<ThemePreference, ThemePreference> = { system: "light", light: "dark", dark: "system" };
-const THEME_LABEL: Record<ThemePreference, string> = { system: "Auto", light: "Light", dark: "Dark" };
-
-function useConfig(): { config: ConfigDTO | null; offline: boolean } {
-  const [state, setState] = useState<{ config: ConfigDTO | null; offline: boolean }>({ config: null, offline: false });
-  useEffect(() => {
-    const controller = new AbortController();
-    api
-      .config(controller.signal)
-      .then((config) => setState({ config, offline: false }))
-      .catch((err: unknown) => {
-        if (!controller.signal.aborted) setState({ config: null, offline: true });
-        if (!(err instanceof DOMException)) console.warn("gateway config unavailable", err);
-      });
-    return () => controller.abort();
-  }, []);
-  return state;
+interface RouteHandle {
+  wide?: boolean;
+  chrome?: "app" | "landing";
 }
 
 function ModeBadges() {
-  const { config, offline } = useConfig();
-  if (offline) return <Badge tone="danger">Gateway offline</Badge>;
+  const { data: config, error } = useGatewayConfig();
+  const health = useGatewayHealth().data;
+  if (error && isGatewayDown(error)) {
+    return (
+      <Badge tone="danger" dot title="Start it with npm run dev">
+        Gateway offline
+      </Badge>
+    );
+  }
   if (!config) return null;
+  const sandbox = config.paypalMode === "sandbox";
+  const llmMock = config.llm.provider === "mock";
+  const llmDown = !llmMock && health?.llm.reachable === false;
   return (
     <>
-      <Badge tone={config.paypalMode === "sandbox" ? "accent" : "neutral"}>PayPal {config.paypalMode}</Badge>
-      <Badge>{config.llm.provider === "mock" ? "LLM mock" : modelLabel(config.llm.model)}</Badge>
+      <Badge
+        tone={sandbox ? "accent" : "neutral"}
+        dot
+        title={sandbox ? "Holds and charges go to PayPal's sandbox" : "PayPal is simulated offline; nothing leaves this machine"}
+      >
+        PayPal {config.paypalMode}
+      </Badge>
+      <Badge
+        tone={llmDown ? "warning" : "neutral"}
+        dot
+        title={
+          llmMock
+            ? "Rule-based stand-in for the model"
+            : llmDown
+              ? `${health?.llm.detail ?? "The model isn't reachable"}. Policies use the fallback parser; reviews escalate to you.`
+              : `${config.llm.provider} · ${config.llm.model}`
+        }
+      >
+        {llmMock ? "LLM mock" : modelLabel(config.llm.model)}
+      </Badge>
     </>
   );
 }
 
-export function AppShell() {
+const CONNECTION_LABEL = { open: "Live updates on", connecting: "Connecting to live updates", closed: "Live updates offline" } as const;
+
+function ConnectionDot() {
   const status = useGatewayStatus();
-  const { preference, setPreference } = useTheme();
-  const wide = useMatches().some((m) => (m.handle as { wide?: boolean } | undefined)?.wide);
+  return (
+    <span className="ui-conn-wrap" title={CONNECTION_LABEL[status]}>
+      <span className="ui-conn" data-status={status} role="img" aria-label={CONNECTION_LABEL[status]} />
+    </span>
+  );
+}
+
+function Nav() {
+  return (
+    <nav className="ui-nav" aria-label="Main">
+      {NAV_LINKS.map((link) => (
+        <NavLink key={link.to} to={link.to}>
+          {link.label}
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
+
+function MenuIcon({ open }: { open: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      {open ? (
+        <path d="M3.5 3.5l9 9m0-9l-9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      ) : (
+        <path d="M2.5 5h11M2.5 11h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      )}
+    </svg>
+  );
+}
+
+export function AppShell() {
+  const matches = useMatches();
+  const handles = matches.map((m) => (m.handle ?? {}) as RouteHandle);
+  const wide = handles.some((h) => h.wide);
+  const landing = handles.some((h) => h.chrome === "landing");
+  const navigation = useNavigation();
+  const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuId = useId();
+
+  useEffect(() => setMenuOpen(false), [location.pathname]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
 
   return (
     <ToastProvider>
+      <a className="skip-link" href="#main">
+        Skip to content
+      </a>
       <div className="ui-shell">
-        <header className="ui-shell-header">
-          <NavLink to="/" className="ui-brand" aria-label="PayPal 402 home">
-            <span className="ui-monogram" aria-hidden="true">
-              402
-            </span>
-            PayPal 402
-          </NavLink>
-          <nav className="ui-nav" aria-label="Main">
-            {NAV_LINKS.map((link) => (
-              <NavLink key={link.to} to={link.to}>
-                {link.label}
-              </NavLink>
-            ))}
-          </nav>
-          <div className="ui-shell-meta">
-            <ModeBadges />
-            <span className="ui-conn" data-status={status} title={`Live events: ${status}`} aria-label={`Live events ${status}`} />
-            <button
-              type="button"
-              className="ui-btn ui-btn--ghost ui-btn--sm"
-              onClick={() => setPreference(NEXT_THEME[preference])}
-              title="Switch theme"
-            >
-              {THEME_LABEL[preference]}
-            </button>
+        <header className={["ui-shell-header", landing && "ui-shell-header--landing"].filter(Boolean).join(" ")}>
+          <div className="ui-shell-bar">
+            <NavLink to="/" className="ui-brand" aria-label="402 Fiatality home">
+              <Logo />
+            </NavLink>
+            <Nav />
+            <div className="ui-shell-meta">
+              {landing ? (
+                <NavLink to="/console" className={buttonClassName({ variant: "secondary", size: "sm" })}>
+                  Open console
+                </NavLink>
+              ) : (
+                <>
+                  <span className="ui-cluster ui-shell-badges">
+                    <ModeBadges />
+                  </span>
+                  <ConnectionDot />
+                </>
+              )}
+              <ThemeToggle />
+              <button
+                type="button"
+                className="ui-btn ui-btn--ghost ui-btn--icon ui-menu-button"
+                aria-expanded={menuOpen}
+                aria-controls={menuId}
+                aria-label={menuOpen ? "Close menu" : "Open menu"}
+                onClick={() => setMenuOpen((open) => !open)}
+              >
+                <MenuIcon open={menuOpen} />
+              </button>
+            </div>
           </div>
+          <div id={menuId} className="ui-menu-panel" data-open={menuOpen}>
+            <Nav />
+            {landing ? null : (
+              <div className="ui-cluster">
+                <ModeBadges />
+              </div>
+            )}
+          </div>
+          {navigation.state === "loading" ? <span className="ui-progress" aria-hidden="true" /> : null}
         </header>
-        <main className={["ui-shell-main", wide && "ui-shell-main--wide"].filter(Boolean).join(" ")}>
+        <main
+          id="main"
+          tabIndex={-1}
+          className={["ui-shell-main", wide && "ui-shell-main--wide", landing && "ui-shell-main--bleed"].filter(Boolean).join(" ")}
+        >
           <Outlet />
         </main>
       </div>
+      <ScrollRestoration />
     </ToastProvider>
   );
 }

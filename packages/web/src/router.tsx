@@ -1,7 +1,8 @@
 /**
  * Routes. Every page module default-exports its component and is loaded lazily, so the heavy pages
  * (AG Grid, AG Studio, Bryntum) never weigh down the landing page. `handle: { wide: true }` gives a page
- * the full window width inside AppShell.
+ * the full window width inside AppShell; `handle: { chrome: "landing" }` swaps in the marketing header (no
+ * live-status chrome, edge-to-edge sections).
  */
 import type { ComponentType } from "react";
 import { createBrowserRouter } from "react-router";
@@ -26,7 +27,7 @@ export const router = createBrowserRouter([
     HydrateFallback: BootFallback,
     ErrorBoundary: RouteError,
     children: [
-      { index: true, lazy: page(() => import("./pages/Landing")) },
+      { index: true, handle: { chrome: "landing" }, lazy: page(() => import("./pages/Landing")) },
       { path: "console", lazy: page(() => import("./pages/Console")) },
       { path: "terminal", handle: { wide: true }, lazy: page(() => import("./pages/Terminal")) },
       { path: "sellers", lazy: page(() => import("./pages/Sellers")) },
