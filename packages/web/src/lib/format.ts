@@ -67,17 +67,21 @@ export function formatRelative(ms: number, now: number = Date.now()): string {
 
 /** 850 -> "850 ms", 12_000 -> "12 s", 3_660_000 -> "1 h 1 min", 3 days -> "3 d". */
 export function formatDuration(ms: number): string {
+  // Round once at the smallest unit shown, then split, so 3 d 23.9 h reads "4 d" (never "3 d 24 h").
   const abs = Math.abs(ms);
   if (abs < 1_000) return `${Math.round(abs)} ms`;
-  if (abs < 60_000) return `${Math.round(abs / 1_000)} s`;
-  if (abs < 3_600_000) return `${Math.round(abs / 60_000)} min`;
-  if (abs < 86_400_000) {
-    const h = Math.floor(abs / 3_600_000);
-    const m = Math.round((abs % 3_600_000) / 60_000);
+  const seconds = Math.round(abs / 1_000);
+  if (seconds < 60) return `${seconds} s`;
+  const minutes = Math.round(abs / 60_000);
+  if (minutes < 60) return `${minutes} min`;
+  if (minutes < 24 * 60) {
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
     return m ? `${h} h ${m} min` : `${h} h`;
   }
-  const d = Math.floor(abs / 86_400_000);
-  const h = Math.round((abs % 86_400_000) / 3_600_000);
+  const hours = Math.round(abs / 3_600_000);
+  const d = Math.floor(hours / 24);
+  const h = hours % 24;
   return h ? `${d} d ${h} h` : `${d} d`;
 }
 
