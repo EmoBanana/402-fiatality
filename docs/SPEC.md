@@ -416,9 +416,10 @@ Each requires `x-api-key: demo-<id>-key` (shows the gateway injecting seller key
 - Feel: calm, precise, editorial. Lots of whitespace, hairline borders, almost no shadows, one accent.
 - Type: Inter Variable (UI) + JetBrains Mono Variable (amounts, ids). `font-variant-numeric: tabular-nums`.
   Scale 12/13/14/16/20/28/40/56. Tight headings (−0.02em), 1.5 body line-height.
-- Light: bg `#FAFAF8`, surface `#FFFFFF`, ink `#0E0E10`, ink-2 `#3F3F46`, muted `#71717A`, hairline `#E7E5E4`,
-  accent `#1D3A6E` (deep navy), accent-soft `#EEF2F9`, success `#15803D`, danger `#B42318`, warning `#B54708`.
-  Dark: bg `#0B0B0C`, surface `#121214`, ink `#F4F4F5`, muted `#A1A1AA`, hairline `#26262A`, accent `#9DB7F5`.
+- Light: bg `#FAFAF8`, surface `#FFFFFF`, ink `#0E0E10`, ink-2 `#3F3F46`, muted `#6B6B73`, hairline `#E7E5E4`,
+  accent `#0F5257` (petrol), accent-soft `#E8F1F0`, success `#15803D`, danger `#B42318`, warning `#B54708`.
+  Dark: bg `#0B0B0C`, surface `#121214`, ink `#F4F4F5`, muted `#A1A1AA`, hairline `#26262A`, accent `#8CCBCB`.
+  (Petrol, not navy: a deep navy sits within ΔE 4 of PayPal's wordmark blues. Muted passes AA on every surface.)
   Tokens as CSS variables; light/dark via `prefers-color-scheme` + a toggle (`data-theme`).
 - Radius 10 (cards) / 8 (inputs) / 999 (pills). 8 px spacing grid. Motion 150–200 ms ease-out.
 - Do not use PayPal's logo or brand colors; use the official PayPal approval page for holds. Simple "402"
