@@ -438,3 +438,146 @@ export interface GridQueryResponseDTO {
   explanation: string;
   model: string;
 }
+
+// ---------------------------------------------------------------- route payloads
+
+/** `{ ok: true }` acknowledgement (e.g. POST /api/tabs/:id/keys). */
+export interface OkDTO {
+  ok: true;
+}
+
+export interface CompanyCreateDTO {
+  name: string;
+}
+
+/** PATCH /api/sellers/:id */
+export interface SellerUpdateDTO {
+  status?: "active" | "paused";
+  endpoints?: Array<{ id: string; priceMicros: Micros }>;
+}
+
+/** Payment channel state for one (tab, seller) pair. */
+export interface ChannelDTO {
+  sellerId: string;
+  lastSeq: number;
+  lastCumulativeMicros: Micros;
+}
+
+/** GET /api/tabs/:id */
+export interface TabDetailDTO extends TabDTO {
+  channels: ChannelDTO[];
+  alarms: AlarmDTO[];
+  reviews: ReviewDTO[];
+  settlements: SettlementDTO[];
+}
+
+/** PATCH /api/tabs/:id/schedule (demo only, Bryntum drag-to-reschedule). Epoch ms. */
+export interface TabScheduleDTO {
+  closeAt?: number;
+  reauthorizeAt?: number;
+}
+
+/** GET /api/vouchers query string. */
+export interface VoucherQueryDTO {
+  tabId?: string;
+  sellerId?: string;
+  status?: VoucherStatus;
+  /** 1..1000, default 200. */
+  limit?: number;
+  /** Only vouchers created before this epoch ms (pagination). */
+  before?: number;
+}
+
+/** POST /api/reviews/:id/decide: a human settles an escalated review. */
+export interface ReviewDecisionDTO {
+  verdict: Exclude<ReviewVerdict, "escalate">;
+  /** For "void": which vouchers to void. Defaults to the AI's suggestion. */
+  voidVoucherIds?: string[];
+  reason?: string;
+}
+
+/** POST /api/payouts/run */
+export interface PayoutRunDTO {
+  /** Minimum balance to pay out. Default 1000 ($10); the demo UI may go lower. */
+  thresholdCents?: number;
+}
+
+export interface PayoutRunResultDTO {
+  /** Null when no seller was over the threshold. */
+  payout: PayoutDTO | null;
+  message: string;
+}
+
+/** POST /api/purchases/:id/checkout */
+export interface PurchaseCheckoutDTO {
+  purchase: PurchaseDTO;
+  approveUrl: string;
+}
+
+/** POST /api/clock/advance (DEMO_MODE only). */
+export interface ClockAdvanceDTO {
+  ms: number;
+}
+
+/**
+ * postMessage from the gateway's /paypal/return and /paypal/cancel pages to the window that opened the
+ * PayPal popup. A fast path only: PayPal's pages may sever `window.opener`, so the console also waits for
+ * the `tab.updated` / `purchase.updated` event.
+ */
+export interface PaypalReturnMessage {
+  type: "p402:paypal-return";
+  kind: "tab" | "purchase";
+  /** Tab id or purchase id. */
+  ref: string;
+  status: "approved" | "cancelled" | "failed";
+  message?: string;
+}
+
+// ---------------------------------------------------------------- POST /api/ai/chat (OpenAI chat.completions subset)
+
+export interface ChatToolCallDTO {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
+}
+
+export interface ChatToolDTO {
+  type: "function";
+  function: { name: string; description?: string; parameters?: Record<string, unknown> };
+}
+
+export interface ChatMessageDTO {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  name?: string;
+  tool_calls?: ChatToolCallDTO[];
+  tool_call_id?: string;
+}
+
+/** Non-streaming only: `stream: true` is answered with one JSON body. */
+export interface ChatRequestDTO {
+  messages: ChatMessageDTO[];
+  tools?: ChatToolDTO[];
+  tool_choice?: "auto" | "none" | "required" | { type: "function"; function: { name: string } };
+  temperature?: number;
+  max_tokens?: number;
+  response_format?:
+    | { type: "text" }
+    | { type: "json_object" }
+    | { type: "json_schema"; json_schema: { name: string; schema: Record<string, unknown>; strict?: boolean } };
+  stream?: boolean;
+}
+
+export interface ChatResponseDTO {
+  id: string;
+  object: "chat.completion";
+  /** Unix seconds. */
+  created: number;
+  model: string;
+  choices: Array<{
+    index: number;
+    message: { role: "assistant"; content: string | null; tool_calls?: ChatToolCallDTO[] };
+    finish_reason: "stop" | "length" | "tool_calls" | null;
+  }>;
+  usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+}
