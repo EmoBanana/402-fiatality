@@ -67,6 +67,8 @@ export interface AppConfig {
   logLevel: string;
   paypal: PaypalConfig;
   llm: LlmConfig;
+  /** Total time for one three-role AI spend review before it escalates to a human (SPEC: 45 s). */
+  reviewBudgetMs: number;
   /** Real Channel3 API instead of the built-in demo catalog seller. */
   channel3ApiKey: string | null;
   /** PayPal sandbox emails that receive the demo sellers' payouts. */
@@ -118,6 +120,7 @@ const envSchema = z.object({
   LLM_BASE_URL: origin,
   LLM_MODEL: z.preprocess(blankToUndefined, z.string().default("gemma4:12b")),
   LLM_API_KEY: optionalText,
+  LLM_REVIEW_BUDGET_MS: z.preprocess(blankToUndefined, z.coerce.number().int().min(5_000).max(600_000).default(45_000)),
   CHANNEL3_API_KEY: optionalText,
   SELLER_PAYPAL_EMAIL_CHANNEL3: optionalText,
   SELLER_PAYPAL_EMAIL_PRICEWATCH: optionalText,
@@ -184,6 +187,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       model: e.LLM_MODEL,
       apiKey: e.LLM_API_KEY ?? null,
     },
+    reviewBudgetMs: e.LLM_REVIEW_BUDGET_MS,
     channel3ApiKey: e.CHANNEL3_API_KEY ?? null,
     sellerEmails: {
       channel3: e.SELLER_PAYPAL_EMAIL_CHANNEL3 ?? null,

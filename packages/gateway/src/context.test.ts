@@ -18,6 +18,7 @@ describe("config", () => {
     expect(c.sellersBaseUrl).toBe("http://localhost:4030");
     expect(c.webBaseUrl).toBe("http://localhost:5173");
     expect(c.dbPath.endsWith("data/p402.sqlite")).toBe(true);
+    expect(c.reviewBudgetMs).toBe(45_000);
   });
 
   it("parses values, treats blanks as unset and trims trailing slashes", () => {
@@ -30,7 +31,9 @@ describe("config", () => {
       LLM_BASE_URL: "",
       CHANNEL3_API_KEY: "  ",
       FLAKY_RATE: "0.5",
+      LLM_REVIEW_BUDGET_MS: "90000",
     });
+    expect(c.reviewBudgetMs).toBe(90_000);
     expect(c.port).toBe(5000);
     expect(c.publicBaseUrl).toBe("https://gw.example.com");
     expect(c.demo).toBe(false);

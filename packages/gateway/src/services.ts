@@ -19,6 +19,7 @@ export function createServices(config: AppConfig): ContextOverrides {
     paypal: (ctx) => createPaypalClient(ctx),
     ai: (ctx) =>
       createAiService(config.llm, {
+        reviewBudgetMs: config.reviewBudgetMs,
         now: () => ctx.clock.now(),
         mockDelayMs: config.llm.provider === "mock" && config.nodeEnv !== "test" ? MOCK_REVIEW_DELAY_MS : 0,
       }),

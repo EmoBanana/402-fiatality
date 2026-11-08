@@ -8,7 +8,7 @@ import { createAgentRunner, MAX_CONCURRENT_RUNS, type AgentRunner } from "./agen
 import { evaluateAlarms } from "./alarms/engine";
 import type { AppContext } from "./context";
 import { parseJson, stmt } from "./db/db";
-import { createReviewRunner, REVIEW_TIMEOUT_MS, type ReviewRunner } from "./review/runner";
+import { createReviewRunner, type ReviewRunner } from "./review/runner";
 import { getTabRow } from "./tabs/state";
 
 export interface CoreOptions {
@@ -31,12 +31,14 @@ export interface Core {
 
 /** After a failed threshold close, wait this long before trying again on the next voucher. */
 const CLOSE_RETRY_MS = 30_000;
+const REVIEW_GRACE_MS = 5_000;
 
 const cores = new WeakMap<AppContext, Core>();
 
 export function createCore(ctx: AppContext, opts: CoreOptions = {}): Core {
   const gatewayUrl = typeof opts.gatewayUrl === "function" ? opts.gatewayUrl : () => (opts.gatewayUrl as string | undefined) ?? ctx.config.publicBaseUrl;
-  const reviews = createReviewRunner(ctx, { timeoutMs: opts.reviewTimeoutMs ?? REVIEW_TIMEOUT_MS });
+  // A grace period past the AI's own budget, so its escalation (with transcript and reason) lands first.
+  const reviews = createReviewRunner(ctx, { timeoutMs: opts.reviewTimeoutMs ?? ctx.config.reviewBudgetMs + REVIEW_GRACE_MS });
   const agents = createAgentRunner(ctx, { gatewayUrl, maxConcurrent: opts.maxConcurrentRuns ?? MAX_CONCURRENT_RUNS });
   const pending = new Set<Promise<void>>();
   const closing = new Set<string>();

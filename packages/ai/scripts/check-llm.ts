@@ -9,7 +9,7 @@ import { loadConfig, loadDotEnv } from "@p402/gateway/config";
 import type { LlmConfig } from "@p402/gateway/context";
 import { formatCents, formatUsd } from "@p402/shared";
 import { z } from "zod";
-import { createAiService, createLlm, REVIEW_BUDGET_MS } from "../src";
+import { createAiService, createLlm } from "../src";
 import { cannedReview, demoCatalog } from "../src/fixtures";
 import { truncate } from "../src/util/text";
 
@@ -87,15 +87,16 @@ function origin(url: string): string {
 async function main(): Promise<void> {
   loadDotEnv();
   let llmConfig: LlmConfig;
+  let reviewBudgetMs: number;
   try {
-    llmConfig = loadConfig().llm;
+    ({ llm: llmConfig, reviewBudgetMs } = loadConfig());
   } catch (err) {
     console.error(red(`✗ ${err instanceof Error ? err.message : String(err)}`));
     process.exit(1);
   }
 
   const llm = createLlm(llmConfig);
-  const ai = createAiService(llmConfig, { llm });
+  const ai = createAiService(llmConfig, { llm, reviewBudgetMs });
 
   console.log(bold("402 Fiatality · LLM check"));
   if (llmConfig.provider === "mock") {
@@ -159,7 +160,7 @@ async function main(): Promise<void> {
     });
     const verdict = `${result.verdict} (${result.fault} fault, confidence ${result.confidence}): ${result.reason}`;
     if (result.verdict !== "freeze") throw new Error(`expected freeze, got ${verdict}`);
-    return `${verdict} [${times.join(", ")}; budget ${REVIEW_BUDGET_MS / 1000} s]`;
+    return `${verdict} [${times.join(", ")}; budget ${reviewBudgetMs / 1000} s]`;
   });
 
   await step("grid query (AG Grid AI Toolkit)", async () => {
