@@ -1,0 +1,315 @@
+/* Seller portal (pages/Sellers.tsx). Prefix `sl-`. Reads tokens only. Designed for 1024 px and up. */
+
+.sl-section {
+  margin-top: var(--space-6);
+}
+
+.sl-stats {
+  margin-top: calc(-1 * var(--space-1));
+}
+
+.sl-stats > .ui-card-body {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.sl-stats .ui-stat + .ui-stat {
+  padding-left: var(--space-3);
+  border-left: var(--border);
+}
+
+.sl-grid-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  align-items: stretch;
+}
+
+/* ------------------------------------------------------------ seller card */
+
+.sl-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.sl-card[data-status="paused"] {
+  background: var(--surface-2);
+}
+
+.sl-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: var(--space-2) var(--space-3);
+}
+
+.sl-card-head h3 {
+  font-size: var(--text-16);
+  letter-spacing: -0.01em;
+}
+
+.sl-card-sub {
+  margin-top: 2px;
+  font-size: var(--text-12);
+  color: var(--muted);
+}
+
+.sl-prices {
+  list-style: none;
+  margin: 0 var(--space-3);
+  border-top: var(--border);
+  border-bottom: var(--border);
+  padding: 6px 0;
+}
+
+.sl-prices li {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-12);
+  font-variant-numeric: tabular-nums;
+}
+
+.sl-method {
+  color: var(--muted);
+}
+
+.sl-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-2);
+}
+
+.sl-price {
+  font-size: var(--text-13);
+  color: var(--ink);
+}
+
+.sl-figures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+}
+
+.sl-figures dt {
+  font-size: var(--text-12);
+  font-weight: var(--weight-medium);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.sl-figures dd {
+  margin: 4px 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-16);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.sl-figures dd.sl-figure-hint {
+  margin-top: 2px;
+  font-family: var(--font-sans);
+  font-size: var(--text-12);
+  color: var(--muted);
+}
+
+.sl-void-high {
+  color: var(--danger) !important;
+}
+
+.sl-card-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: auto;
+  padding: 14px var(--space-3) var(--space-2);
+  border-top: var(--border);
+  font-size: var(--text-12);
+}
+
+.sl-rules-text {
+  color: var(--ink-2);
+}
+
+.sl-gateway {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sl-gateway code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  border: var(--border);
+  font-size: var(--text-12);
+  color: var(--ink);
+}
+
+.sl-gateway .ui-btn {
+  height: 24px;
+  padding: 0 8px;
+  font-size: var(--text-12);
+}
+
+.sl-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sl-payto {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.sl-payto .mono {
+  color: var(--ink-2);
+}
+
+/* ------------------------------------------------------------ payouts */
+
+.sl-payout-run {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.sl-payout-run .ui-field {
+  width: 220px;
+}
+
+.sl-payout-sellers {
+  display: inline-block;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.sl-table-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: var(--space-3);
+}
+
+/* ------------------------------------------------------------ list your API form */
+
+.sl-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.sl-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.sl-fieldset > legend {
+  /* Floated so the legend sits inside the fieldset instead of cutting through its top rule. */
+  float: left;
+  width: 100%;
+  margin-bottom: var(--space-1);
+  padding: 0;
+  font-size: var(--text-14);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.sl-fieldset > legend + * {
+  clear: both;
+}
+
+.sl-fieldset + .sl-fieldset {
+  padding-top: var(--space-3);
+  border-top: var(--border);
+}
+
+.sl-help {
+  margin-top: -8px;
+  font-size: var(--text-13);
+  color: var(--muted);
+}
+
+.sl-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.sl-endpoints {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sl-endpoint {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) 128px 32px;
+  gap: 8px;
+  align-items: end;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--hairline);
+}
+
+.sl-endpoint .sl-remove {
+  margin-bottom: 3px;
+}
+
+.sl-endpoint-desc {
+  grid-column: 1 / -2;
+}
+
+.sl-add {
+  align-self: flex-start;
+}
+
+.sl-rules {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px var(--space-2);
+}
+
+@media (max-width: 1100px) {
+  .sl-stats > .ui-card-body {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sl-stats .ui-stat:nth-child(3) {
+    padding-left: 0;
+    border-left: 0;
+  }
+}
+
+@media (max-width: 960px) {
+  .sl-grid-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
