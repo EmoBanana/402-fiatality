@@ -1,0 +1,21 @@
+{
+  "name": "@p402/ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Gemma 4 client (Ollama), plain-English policy parser, AI spend review and grid queries.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@p402/shared": "*",
+    "ollama": "^0.6.4",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@p402/gateway": "*"
+  }
+}

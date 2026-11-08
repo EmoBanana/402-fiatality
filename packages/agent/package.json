@@ -1,0 +1,21 @@
+{
+  "name": "@p402/agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "x402 client with signed IOUs and the price-aware Gemma shopping agent.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@p402/ai": "*",
+    "@p402/shared": "*",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@p402/gateway": "*"
+  }
+}
