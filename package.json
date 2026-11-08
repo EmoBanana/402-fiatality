@@ -1,0 +1,31 @@
+{
+  "name": "paypal-402",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "HTTP 402 micropayments for AI agents on PayPal: one hold, signed IOUs per call, one charge.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n gateway,sellers,web -c blue,gray,magenta \"npm:dev -w @p402/gateway\" \"npm:dev -w @p402/sellers\" \"npm:dev -w @p402/web\"",
+    "start": "npm run build -w @p402/web && concurrently -k -n gateway,sellers -c blue,gray \"npm:start -w @p402/gateway\" \"npm:start -w @p402/sellers\"",
+    "build": "npm run build -w @p402/web",
+    "test": "vitest run",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "agent": "tsx packages/agent/src/cli.ts",
+    "check:paypal": "tsx packages/gateway/scripts/check-paypal.ts",
+    "check:llm": "tsx packages/ai/scripts/check-llm.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "concurrently": "^10.0.7",
+    "tsx": "^4.23.15",
+    "typescript": "~5.9.3",
+    "vitest": "^5.1.0"
+  }
+}

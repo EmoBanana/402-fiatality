@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.local
+*.log
+.DS_Store
+data/
+*.sqlite
+*.sqlite-journal
+*.db
+*.db-wal
+*.db-shm
+packages/web/dist/
+.vite/
+playwright-report/
+test-results/
