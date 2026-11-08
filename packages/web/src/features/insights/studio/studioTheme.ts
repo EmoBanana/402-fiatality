@@ -1,0 +1,83 @@
+/**
+ * AG Studio theme from the design tokens: Studio's theme params take literal values (its charts render on
+ * a canvas), so the theme is rebuilt from `readTokens()` whenever light/dark changes.
+ */
+import { studioTheme } from "ag-studio";
+import type { Tokens } from "../tokens";
+
+export function buildStudioTheme(t: Tokens) {
+  const palette = Object.fromEntries(
+    t.series.flatMap((color, i) => [
+      [`chartPaletteFills${i + 1}Color`, color],
+      [`chartPaletteStrokes${i + 1}Color`, color],
+    ]),
+  );
+  return studioTheme.withParams({
+    ...palette,
+    browserColorScheme: t.mode,
+    fontFamily: t.fontSans,
+    fontSize: 13,
+    backgroundColor: t.surface,
+    foregroundColor: t.ink,
+    textColor: t.ink,
+    subtleTextColor: t.muted,
+    accentColor: t.accent,
+    borderColor: t.hairline,
+    borderRadius: 8,
+    iconColor: t.ink2,
+    menuBackgroundColor: t.surface,
+    menuTextColor: t.ink,
+    tooltipBackgroundColor: t.surface,
+    tooltipTextColor: t.ink,
+    rowHoverColor: t.surface2,
+    studioWrapperBackgroundColor: t.surface,
+    studioWrapperBorder: false,
+    studioWrapperBorderRadius: 0,
+    studioPanelContainerBackgroundColor: t.surface,
+    studioPanelContainerBorder: false,
+    studioPanelDividerColor: t.hairline,
+    studioCanvasBackgroundColor: t.bg,
+    studioCanvasFontFamily: t.fontSans,
+    studioCanvasGridLineColor: t.hairline,
+    studioWidgetBackgroundColor: t.surface,
+    studioWidgetBorder: { color: t.hairline, width: 1 },
+    studioWidgetBorderRadius: 10,
+    studioWidgetPadding: 8,
+    studioWidgetTitleFontFamily: t.fontSans,
+    studioWidgetTitleFontSize: 13,
+    studioWidgetTitleFontWeight: 600,
+    studioWidgetTitleTextColor: t.ink,
+    studioWidgetSubtitleFontFamily: t.fontSans,
+    studioWidgetSubtitleTextColor: t.muted,
+    studioWidgetCaptionFontFamily: t.fontSans,
+    studioWidgetCaptionTextColor: t.muted,
+    studioWidgetSelectedBorderColor: t.accent,
+    studioToggleButtonActiveBackgroundColor: t.accent,
+    studioToggleButtonActiveBorderColor: t.accent,
+    studioToggleButtonActiveColor: t.accent,
+    studioAiPanelInputMessageBackgroundColor: t.accentSoft,
+    studioAiPanelRichTextAccentBackgroundColor: t.accentSoft,
+    studioValueWidgetFontSize: 26,
+    // Room for the canvas next to the AI panel on laptop widths.
+    studioAiPanelWidth: 320,
+    studioCanvasMinWidth: 560,
+    chartFontFamily: t.fontSans,
+    chartTextColor: t.ink2,
+    chartSubtleTextColor: t.muted,
+    chartAxisLabelColor: t.muted,
+    chartAxisTitleColor: t.muted,
+    chartAxisLineColor: t.hairlineStrong,
+    chartGridLineColor: t.hairline,
+    chartSeriesLabelOutsideTextColor: t.ink2,
+    gridFontFamily: t.fontSans,
+    gridHeaderBackgroundColor: t.surface,
+    gridHeaderTextColor: t.muted,
+    gridDataBackgroundColor: t.surface,
+    gridCellTextColor: t.ink2,
+    gridRowBorder: { color: t.hairline, width: 1 },
+    gridHeaderRowBorder: { color: t.hairline, width: 1 },
+    gridRowHoverColor: t.surface2,
+    gridRowHeight: 34,
+    gridWrapperBorder: false,
+  });
+}
