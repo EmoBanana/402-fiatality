@@ -5,8 +5,8 @@
 import type { LlmMessage, SpendReviewInput } from "@p402/gateway/context";
 import { analyzeVouchers, buildEvidence, buildFacts, clean } from "./evidence";
 
-/** Each argument is asked for in at most this many words (the spec allows 120; shorter is faster locally). */
-export const ARGUMENT_WORDS = 70;
+/** Each argument is asked for in at most this many words (the spec allows 120; Gemma 4 12B on a 16 GB Mac writes about 5-7 tokens a second, and all three roles share one review budget, 45 s by default). */
+export const ARGUMENT_WORDS = 35;
 
 export const REVIEW_SYSTEM = [
   "You take part in an AI spend review for 402 Fiatality, where AI agents pay sellers' APIs per call from their company's PayPal hold.",

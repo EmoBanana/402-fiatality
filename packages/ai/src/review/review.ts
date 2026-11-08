@@ -67,7 +67,7 @@ export async function runReview(
     }
 
     const context = reviewContext(input);
-    const argue = { signal: combined, timeoutMs: budgetMs, maxTokens: 170, temperature: 0.3 };
+    const argue = { signal: combined, timeoutMs: budgetMs, maxTokens: 80, temperature: 0.3 };
     const prosecution = cleanArgument(await llm.chat([...context, prosecutorTurn()], argue));
     say("prosecutor", prosecution);
     const defense = cleanArgument(await llm.chat([...context, defenderTurn(prosecution)], argue));
