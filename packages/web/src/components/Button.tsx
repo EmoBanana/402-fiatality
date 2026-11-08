@@ -1,5 +1,6 @@
 /**
- * Button. Variants: primary (the one accent action per view), secondary, ghost, danger. Sizes: sm | md | lg.
+ * Button. Variants: primary (the one accent action per view), secondary, ghost, danger.
+ * Sizes: sm | md | lg | icon (32 px square; give it an aria-label).
  *   <Button variant="primary" loading={busy} onClick={approve}>Approve hold with PayPal</Button>
  *   <Link className={buttonClassName({ variant: "secondary" })} to="/terminal">View terminal</Link>
  */
@@ -7,7 +8,7 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { Spinner } from "./Spinner";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
-export type ButtonSize = "sm" | "md" | "lg";
+export type ButtonSize = "sm" | "md" | "lg" | "icon";
 
 export function buttonClassName({ variant = "secondary", size = "md", className }: { variant?: ButtonVariant; size?: ButtonSize; className?: string } = {}): string {
   return ["ui-btn", `ui-btn--${variant}`, size !== "md" && `ui-btn--${size}`, className].filter(Boolean).join(" ");
@@ -30,7 +31,7 @@ export function Button({ variant = "secondary", size = "md", loading = false, ic
       aria-busy={loading || undefined}
       {...rest}
     >
-      {loading ? <Spinner size={14} /> : icon}
+      {loading ? <Spinner size={14} label="Working" /> : icon}
       {children}
     </button>
   );
