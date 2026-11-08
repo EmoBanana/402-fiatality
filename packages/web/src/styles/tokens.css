@@ -1,0 +1,154 @@
+/*
+ * PayPal 402 design tokens (SPEC §9.1). Calm, precise, editorial: hairlines, whitespace, one accent.
+ * Theme: follows prefers-color-scheme unless <html data-theme="light|dark"> pins it (see lib/theme.ts).
+ * Never hard-code colors in components; AG Grid, AG Charts and Bryntum themes read these too.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Surfaces and ink */
+  --bg: #fafaf8;
+  --surface: #ffffff;
+  --surface-2: #f4f4f2;
+  --ink: #0e0e10;
+  --ink-2: #3f3f46;
+  --muted: #71717a;
+  --hairline: #e7e5e4;
+  --hairline-strong: #d6d3d1;
+
+  /* The one accent */
+  --accent: #1d3a6e;
+  --accent-soft: #eef2f9;
+  --on-accent: #ffffff;
+
+  /* Status */
+  --success: #15803d;
+  --success-soft: #ecfdf3;
+  --danger: #b42318;
+  --danger-soft: #fef3f2;
+  --warning: #b54708;
+  --warning-soft: #fffaeb;
+
+  /* Chart series (categorical, in order). Status colors stay reserved for status. */
+  --series-1: #1d3a6e;
+  --series-2: #0f766e;
+  --series-3: #a15c07;
+  --series-4: #6d28d9;
+  --series-5: #be185d;
+  --series-6: #4d7c0f;
+
+  /* Overlays */
+  --overlay: rgba(14, 14, 16, 0.24);
+  --shadow-overlay: 0 12px 32px rgba(14, 14, 16, 0.12), 0 2px 6px rgba(14, 14, 16, 0.06);
+  --focus-ring: 0 0 0 3px rgba(29, 58, 110, 0.32);
+
+  /* Type */
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --text-12: 12px;
+  --text-13: 13px;
+  --text-14: 14px;
+  --text-16: 16px;
+  --text-20: 20px;
+  --text-28: 28px;
+  --text-40: 40px;
+  --text-56: 56px;
+  --leading-tight: 1.15;
+  --leading-snug: 1.3;
+  --leading-body: 1.5;
+  --tracking-tight: -0.02em;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  /* Space: 8 px grid (plus a 4 px half step) */
+  --space-half: 4px;
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-5: 40px;
+  --space-6: 48px;
+  --space-8: 64px;
+  --space-10: 80px;
+  --space-12: 96px;
+
+  /* Shape */
+  --radius-card: 10px;
+  --radius-input: 8px;
+  --radius-pill: 999px;
+  --border: 1px solid var(--hairline);
+
+  /* Motion */
+  --duration-fast: 150ms;
+  --duration: 200ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Layout */
+  --content-max: 1200px;
+  --header-height: 56px;
+}
+
+/* Dark values, applied by the OS setting (unless pinned light) or by data-theme="dark". */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0b0b0c;
+    --surface: #121214;
+    --surface-2: #18181b;
+    --ink: #f4f4f5;
+    --ink-2: #d4d4d8;
+    --muted: #a1a1aa;
+    --hairline: #26262a;
+    --hairline-strong: #3f3f46;
+    --accent: #9db7f5;
+    --accent-soft: #151c2c;
+    --on-accent: #0b0b0c;
+    --success: #4cc38a;
+    --success-soft: #0e2a1b;
+    --danger: #f97066;
+    --danger-soft: #2d1412;
+    --warning: #fdb022;
+    --warning-soft: #2b1f0c;
+    --series-1: #9db7f5;
+    --series-2: #5ec4b6;
+    --series-3: #f0a35e;
+    --series-4: #b9a3f5;
+    --series-5: #f28fb8;
+    --series-6: #a3cf6b;
+    --overlay: rgba(0, 0, 0, 0.55);
+    --shadow-overlay: 0 12px 32px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4);
+    --focus-ring: 0 0 0 3px rgba(157, 183, 245, 0.4);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0b0b0c;
+  --surface: #121214;
+  --surface-2: #18181b;
+  --ink: #f4f4f5;
+  --ink-2: #d4d4d8;
+  --muted: #a1a1aa;
+  --hairline: #26262a;
+  --hairline-strong: #3f3f46;
+  --accent: #9db7f5;
+  --accent-soft: #151c2c;
+  --on-accent: #0b0b0c;
+  --success: #4cc38a;
+  --success-soft: #0e2a1b;
+  --danger: #f97066;
+  --danger-soft: #2d1412;
+  --warning: #fdb022;
+  --warning-soft: #2b1f0c;
+  --series-1: #9db7f5;
+  --series-2: #5ec4b6;
+  --series-3: #f0a35e;
+  --series-4: #b9a3f5;
+  --series-5: #f28fb8;
+  --series-6: #a3cf6b;
+  --overlay: rgba(0, 0, 0, 0.55);
+  --shadow-overlay: 0 12px 32px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4);
+  --focus-ring: 0 0 0 3px rgba(157, 183, 245, 0.4);
+}
