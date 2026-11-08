@@ -135,7 +135,7 @@ function buildColumns(store: TerminalStore): ColDef<VoucherRow>[] {
         p.node.footer && p.api.getRowGroupColumns().length === 0 ? { component: TotalCell } : { component: "agGroupCellRenderer" },
       cellClass: (p) => (p.node?.footer ? "tx-mono" : ["tx-time", "tx-mono"]),
       valueFormatter: (p) => (typeof p.value === "number" ? formatTime(p.value) : ""),
-      tooltipValueGetter: (p) => (typeof p.value === "number" ? formatDateTime(p.value) : undefined),
+      tooltip: (p) => (typeof p.value === "number" ? formatDateTime(p.value) : undefined),
       filter: "agDateColumnFilter",
       filterParams: {
         filterOptions: [
@@ -172,7 +172,7 @@ function buildColumns(store: TerminalStore): ColDef<VoucherRow>[] {
       minWidth: 150,
       cellRenderer: RequestCell,
       filter: "agTextColumnFilter",
-      tooltipValueGetter: (p) => (p.data ? `${p.data.method} ${p.data.path}` : undefined),
+      tooltip: (p) => (p.data ? `${p.data.method} ${p.data.path}` : undefined),
     },
     {
       colId: "status",
@@ -183,7 +183,7 @@ function buildColumns(store: TerminalStore): ColDef<VoucherRow>[] {
       enableRowGroup: true,
       enableCellChangeFlash: true,
       valueFormatter: label("status"),
-      tooltipValueGetter: (p) => (p.data?.status === "voided" ? `Voided: ${voidReasonLabel(p.data.voidReason)} (not billed)` : undefined),
+      tooltip: (p) => (p.data?.status === "voided" ? `Voided: ${voidReasonLabel(p.data.voidReason)} (not billed)` : undefined),
       ...setFilter("status"),
     },
     {
@@ -215,7 +215,7 @@ function buildColumns(store: TerminalStore): ColDef<VoucherRow>[] {
       minWidth: 140,
       enableRowGroup: true,
       valueFormatter: label("taskId"),
-      tooltipValueGetter: (p) => (p.value ? store.taskLabel(p.value) : undefined),
+      tooltip: (p) => (p.value ? store.taskLabel(p.value) : undefined),
       ...setFilter("taskId"),
     },
     {
@@ -227,7 +227,7 @@ function buildColumns(store: TerminalStore): ColDef<VoucherRow>[] {
       enableRowGroup: true,
       cellClass: "tx-mono",
       valueFormatter: label("agentId"),
-      tooltipValueGetter: (p) => p.value ?? undefined,
+      tooltip: (p) => p.value ?? undefined,
       ...setFilter("agentId"),
     },
     {
@@ -277,7 +277,7 @@ function buildColumns(store: TerminalStore): ColDef<VoucherRow>[] {
       enableRowGroup: true,
       cellClass: "tx-mono",
       valueFormatter: label("tabId"),
-      tooltipValueGetter: (p) => p.value ?? undefined,
+      tooltip: (p) => p.value ?? undefined,
       ...setFilter("tabId"),
     },
     { colId: "seq", field: "seq", headerName: "Seq", width: 84, hide: true, type: "rightAligned", cellClass: "tx-mono", filter: "agNumberColumnFilter" },
@@ -309,7 +309,7 @@ function buildColumns(store: TerminalStore): ColDef<VoucherRow>[] {
       hide: true,
       cellClass: "tx-mono",
       valueFormatter: (p) => (p.value ? shortId(p.value) : "Open tab"),
-      tooltipValueGetter: (p) => p.value ?? "Not charged yet: the tab is still open",
+      tooltip: (p) => p.value ?? "Not charged yet: the tab is still open",
       filter: "agSetColumnFilter",
       filterParams: { valueFormatter: (p: ValueFormatterParams) => (p.value ? shortId(String(p.value)) : "Open tab") },
     },
@@ -321,7 +321,7 @@ function buildColumns(store: TerminalStore): ColDef<VoucherRow>[] {
       hide: true,
       cellClass: "tx-mono",
       valueFormatter: label("id"),
-      tooltipValueGetter: (p) => p.value ?? undefined,
+      tooltip: (p) => p.value ?? undefined,
       filter: "agTextColumnFilter",
     },
   ];
@@ -439,7 +439,7 @@ export function VouchersGrid({ feed, onApi }: VouchersGridProps) {
       headerName: "Group",
       minWidth: 230,
       cellRendererParams: { innerRenderer: makeGroupInner(store), suppressCount: false },
-      tooltipValueGetter: (p) =>
+      tooltip: (p) =>
         p.node?.group && !p.node.footer ? `${bucketText(store, p.node.rowGroupColumn?.getColId(), p.node.key)} (${p.node.allChildrenCount ?? 0})` : undefined,
     }),
     [store],

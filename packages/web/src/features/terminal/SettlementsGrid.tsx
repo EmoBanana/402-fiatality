@@ -99,7 +99,7 @@ export function SettlementsGrid({ onApi }: { onApi: (api: GridApi<SettlementDTO>
         cellClass: (p) => (p.node?.footer ? "tx-mono" : ["tx-time", "tx-mono"]),
         valueFormatter: (p) => (typeof p.value === "number" ? formatDateTime(p.value) : ""),
       },
-      { field: "tabId", headerName: "Tab", width: 112, cellClass: "tx-mono", valueFormatter: (p) => (p.value ? shortId(p.value) : ""), tooltipField: "tabId" },
+      { field: "tabId", headerName: "Tab", width: 112, cellClass: "tx-mono", valueFormatter: (p) => (p.value ? shortId(p.value) : ""), tooltip: (p) => p.value },
       { field: "callCount", headerName: "Calls", width: 84, ...count },
       { field: "billableMicros", headerName: "Billable", width: 104, ...money },
       { field: "chargedCents", headerName: "Charged", width: 100, ...cents, headerTooltip: "The one PayPal capture (billable floored to the cent)" },
@@ -127,7 +127,7 @@ export function SettlementsGrid({ onApi }: { onApi: (api: GridApi<SettlementDTO>
       { field: "status", headerName: "Status", width: 104, cellRenderer: SettlementStatusCell, filter: "agSetColumnFilter" },
       { field: "voidCount", headerName: "Voids", width: 80, ...count },
       { field: "carryOutMicros", headerName: "Carried over", width: 116, ...money, aggFunc: undefined, headerTooltip: "Sub-cent remainder rolled into the next tab" },
-      { field: "captureId", headerName: "PayPal capture", flex: 1, minWidth: 150, cellClass: "tx-mono", tooltipField: "captureId" },
+      { field: "captureId", headerName: "PayPal capture", flex: 1, minWidth: 150, cellClass: "tx-mono", tooltip: (p) => p.value },
     ],
     [],
   );

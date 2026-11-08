@@ -83,7 +83,7 @@ export function PayoutsGrid({ onApi }: { onApi: (api: GridApi<PayoutDTO> | null)
         cellClass: (p) => (p.node?.footer ? "tx-mono" : ["tx-time", "tx-mono"]),
         valueFormatter: (p) => (typeof p.value === "number" ? formatDateTime(p.value) : ""),
       },
-      { field: "id", headerName: "Payout", width: 140, cellClass: "tx-mono", valueFormatter: (p) => (p.value ? shortId(p.value) : ""), tooltipField: "id" },
+      { field: "id", headerName: "Payout", width: 140, cellClass: "tx-mono", valueFormatter: (p) => (p.value ? shortId(p.value) : ""), tooltip: (p) => p.value },
       { field: "status", headerName: "Status", width: 112, cellRenderer: PayoutStatusCell, filter: "agSetColumnFilter" },
       {
         colId: "sellers",
@@ -100,7 +100,7 @@ export function PayoutsGrid({ onApi }: { onApi: (api: GridApi<PayoutDTO> | null)
       },
       { field: "totalCents", headerName: "Paid out", width: 130, ...cents },
       { field: "feeCents", headerName: "Payout fees", width: 124, ...cents, headerTooltip: "PayPal Payouts API: $0.25 per item, deducted from each payout" },
-      { field: "paypalBatchId", headerName: "PayPal batch", flex: 1, minWidth: 160, cellClass: "tx-mono", tooltipField: "paypalBatchId" },
+      { field: "paypalBatchId", headerName: "PayPal batch", flex: 1, minWidth: 160, cellClass: "tx-mono", tooltip: (p) => p.value },
       { field: "error", headerName: "Error", flex: 1, minWidth: 140, hide: true },
     ],
     [],
