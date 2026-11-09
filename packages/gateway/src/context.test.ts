@@ -1,4 +1,5 @@
 import { DEFAULT_POLICY, DEFAULT_VOID_RULES, type GatewayEvent } from "@p402/shared";
+import { join } from "node:path";
 import pino from "pino";
 import { describe, expect, it } from "vitest";
 import { ClockLockedError, createClock, DAY_MS } from "./clock";
@@ -32,8 +33,10 @@ describe("config", () => {
       CHANNEL3_API_KEY: "  ",
       FLAKY_RATE: "0.5",
       LLM_REVIEW_BUDGET_MS: "90000",
+      DATA_DIR: "tmp/review",
     });
     expect(c.reviewBudgetMs).toBe(90_000);
+    expect(c.dbPath).toBe(join(c.rootDir, "tmp", "review", "p402.sqlite"));
     expect(c.port).toBe(5000);
     expect(c.publicBaseUrl).toBe("https://gw.example.com");
     expect(c.demo).toBe(false);

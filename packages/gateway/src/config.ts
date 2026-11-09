@@ -6,7 +6,7 @@
  * Never log the secret fields (PayPal client secret, API keys, admin token, master key).
  */
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import type { PaypalMode } from "@p402/shared";
@@ -42,7 +42,7 @@ export interface SellerEmails {
 
 export interface AppConfig {
   rootDir: string;
-  /** `<root>/data`: SQLite file, generated master key. Gitignored. */
+  /** `<root>/data` unless DATA_DIR says otherwise: SQLite file, generated master key. Gitignored. */
   dataDir: string;
   /** SQLite path, or ":memory:" in tests. */
   dbPath: string;
@@ -126,6 +126,7 @@ const envSchema = z.object({
   SELLER_PAYPAL_EMAIL_PRICEWATCH: optionalText,
   SELLER_PAYPAL_EMAIL_REVIEWS: optionalText,
   MASTER_KEY: optionalText,
+  DATA_DIR: optionalText,
   FLAKY_RATE: z.preprocess(blankToUndefined, z.coerce.number().min(0).max(1).default(0.3)),
 });
 
@@ -158,7 +159,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new ConfigError("DEMO_MODE=0 needs ADMIN_TOKEN (sent as the x-p402-admin header on mutating /api calls).");
   }
 
-  const dataDir = join(ROOT_DIR, "data");
+  const dataDir = e.DATA_DIR ? resolve(ROOT_DIR, e.DATA_DIR) : join(ROOT_DIR, "data");
   return {
     rootDir: ROOT_DIR,
     dataDir,
