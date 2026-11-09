@@ -389,6 +389,11 @@
   white-space: nowrap;
 }
 
+/* Numeric headers stay right-aligned but read as headers, in the same face as the others. */
+.lp-math-table thead .is-num {
+  font-family: var(--font-sans);
+}
+
 .lp-math-table tbody tr:nth-child(2) .is-num {
   color: var(--danger);
 }
