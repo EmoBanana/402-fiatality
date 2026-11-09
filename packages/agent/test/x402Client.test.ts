@@ -1,3 +1,5 @@
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { generateAgentKeyPair, requestHash } from "@p402/shared/node";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ChannelBook, matchPath, X402Client, X402Error, type X402ClientOptions } from "../src/x402Client";
@@ -203,6 +205,24 @@ describe("X402Client", () => {
     expect(api.length).toBeGreaterThan(0);
     expect(api.every((r) => r.adminHeader)).toBe(true);
     expect(paywall.some((r) => r.adminHeader)).toBe(false);
+  });
+
+  it("never signs or sends a voucher to another origin", async () => {
+    const seen: Array<string | undefined> = [];
+    const other = createServer((req, res) => {
+      seen.push(req.headers["payment-signature"] as string | undefined);
+      res.writeHead(200, { "content-type": "application/json" }).end("{}");
+    });
+    await new Promise<void>((resolve) => other.listen(0, "127.0.0.1", resolve));
+    try {
+      const c = client(setup());
+      const url = `http://127.0.0.1:${(other.address() as AddressInfo).port}/s/data/v1/items/a1`;
+      await expect(c.fetch(url)).rejects.toMatchObject({ reason: "not_paywall_url" });
+      expect(seen).toEqual([]);
+      expect(c.channel("data")).toEqual({ seq: 0, cumulative: 0 });
+    } finally {
+      await new Promise<void>((resolve) => other.close(() => resolve()));
+    }
   });
 
   it("rejects URLs outside the paywall and matches path patterns", async () => {

@@ -485,6 +485,10 @@ export class X402Client {
 
   private parseTarget(url: string): Target {
     const parsed = new URL(url, `${this.gatewayUrl}/`);
+    // A signed, unspent voucher buys its request for whoever presents it: never send one to another origin.
+    if (parsed.origin !== new URL(this.gatewayUrl).origin) {
+      throw new X402Error("not_paywall_url", `Not this gateway's paywall (${new URL(this.gatewayUrl).origin}): ${parsed.origin}`);
+    }
     const match = /^\/s\/([^/]+)(\/.*)?$/.exec(parsed.pathname);
     if (!match?.[1]) throw new X402Error("not_paywall_url", `Not a paywall URL (expected /s/<sellerId>/...): ${parsed.pathname}`);
     const path = match[2] ?? "/";
