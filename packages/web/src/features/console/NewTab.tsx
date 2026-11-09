@@ -57,7 +57,8 @@ export function NewTab({ companies, companyId, onCompanyChange, onCreated }: New
   const company = companies.data?.find((c) => c.id === companyId) ?? null;
   const checked = useMemo(() => (draft ? policyFromDraft(draft) : null), [draft]);
   const edited = Boolean(draft && baseDraft && !sameDraft(draft, baseDraft));
-  const modelName = config ? (config.llm.provider === "mock" ? "the mock model" : modelLabel(config.llm.model)) : "Gemma 4";
+  // Starts a sentence wherever it is shown, hence the capital.
+  const modelName = config ? (config.llm.provider === "mock" ? "The mock model" : modelLabel(config.llm.model)) : "Gemma 4";
 
   async function addCompany(e: FormEvent) {
     e.preventDefault();
@@ -208,7 +209,8 @@ export function NewTab({ companies, companyId, onCompanyChange, onCreated }: New
             <span className="muted">Try</span>
             {BUDGET_EXAMPLES.map((example) => (
               <button key={example} type="button" className="cs-chip cs-chip--quiet" onClick={() => setBudget(example)} title={example}>
-                {example.split(".")[0]}
+                {/* The first clause as the label; a click fills in the whole example. */}
+                {example.split(/[.,]/)[0]}
               </button>
             ))}
           </div>

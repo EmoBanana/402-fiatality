@@ -276,7 +276,7 @@ export function TabWorkspace({ tabId }: { tabId: string }) {
                 ))}
               </div>
             ) : (
-              <p className="muted cs-note">No purchase proposed yet. A Gemma run ends with one when it finds something worth buying.</p>
+              <p className="muted cs-note">No purchase proposed yet. An agent run ends with one when it finds something worth buying.</p>
             )}
           </StepSection>
           <StepSection n={6} title="Close the tab" state={states.close} description="One PayPal charge for everything billable. Sellers are paid weekly.">

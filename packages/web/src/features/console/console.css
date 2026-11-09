@@ -225,10 +225,12 @@
   font-size: var(--text-13);
 }
 
+/* Text-only pills. inline-block (not flex) so a label that is too long ends in an ellipsis instead of being cut. */
 .cs-chip {
-  display: inline-flex;
-  align-items: center;
+  display: inline-block;
+  vertical-align: middle;
   height: 28px;
+  line-height: 26px;
   max-width: 100%;
   padding: 0 12px;
   border-radius: var(--radius-pill);
@@ -256,8 +258,8 @@
 
 .cs-chip--quiet {
   height: 26px;
+  line-height: 24px;
   border-style: dashed;
-  max-width: 280px;
 }
 
 .cs-policy {

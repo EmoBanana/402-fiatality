@@ -17,9 +17,19 @@ const KIND_LABEL: Record<AgentStepDTO["kind"], string> = {
   finished: "Done",
 };
 
+/** A paid call's list price, which the agent reports in the step's data (its cost is 0 once voided). */
+function listPrice(step: AgentStepDTO): number | undefined {
+  const data = step.data;
+  if (!data || typeof data !== "object" || !("priceMicros" in data)) return undefined;
+  const price = (data as { priceMicros?: unknown }).priceMicros;
+  return typeof price === "number" && Number.isFinite(price) ? price : undefined;
+}
+
 function Step({ step }: { step: AgentStepDTO }) {
   const voided = step.kind === "paid_call" && step.status === "voided";
   if (step.kind === "paid_call") {
+    // A voided call shows the price it would have cost, struck through (as on the IOU tape), not a struck $0.00.
+    const shownCost = voided ? (listPrice(step) ?? step.costMicros) : step.costMicros;
     return (
       <li className="cs-feed-row cs-feed-call" data-void={voided || undefined}>
         <time className="cs-feed-time">{formatTime(step.at)}</time>
@@ -30,7 +40,10 @@ function Step({ step }: { step: AgentStepDTO }) {
           </span>
           <span className="cs-feed-text">{voided ? `Voided: ${voidReasonLabel(step.voidReason)}` : step.text}</span>
         </span>
-        <span className="cs-feed-cost">{typeof step.costMicros === "number" ? <Money micros={step.costMicros} padTo={3} /> : null}</span>
+        <span className="cs-feed-cost">
+          {voided ? <span className="visually-hidden">Not billed: </span> : null}
+          {typeof shownCost === "number" ? <Money micros={shownCost} padTo={3} /> : null}
+        </span>
         <span className="cs-feed-cum">{typeof step.cumulativeMicros === "number" ? <Money micros={step.cumulativeMicros} padTo={3} /> : null}</span>
       </li>
     );

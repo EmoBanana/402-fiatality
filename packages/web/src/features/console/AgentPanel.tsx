@@ -33,6 +33,13 @@ const MODE_HINT: Record<AgentMode, string> = {
 
 const MODE_LABEL: Record<AgentMode, string> = { llm: "Gemma 4", scripted: "Scripted", runaway: "Runaway" };
 
+/** True when the run's summary is already the feed's last line ("Done …"), so the card doesn't print it twice. */
+function summaryIsLastStep(run: AgentRunDTO): boolean {
+  const last = run.steps.at(-1);
+  const summary = run.result?.summary?.trim();
+  return !run.error && !!summary && last?.kind === "finished" && last.text.trim() === summary;
+}
+
 export interface AgentPanelProps {
   tab: TabDetailDTO;
   runs: AgentRunDTO[];
@@ -173,7 +180,7 @@ export function AgentPanel({ tab, runs, onRun }: AgentPanelProps) {
           ) : (
             <EmptyState compact title="Starting the agent" description="Its first paid call will appear here with the price it paid." />
           )}
-          {run.status !== "running" && (run.result?.summary || run.error) ? (
+          {run.status !== "running" && (run.result?.summary || run.error) && !summaryIsLastStep(run) ? (
             <p className={run.error ? "cs-run-result ui-error" : "cs-run-result"}>{run.error ?? run.result?.summary}</p>
           ) : null}
         </div>
