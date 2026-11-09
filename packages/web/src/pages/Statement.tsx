@@ -11,6 +11,7 @@ import { Button, buttonClassName } from "../components/Button";
 import { Callout } from "../components/Callout";
 import { EmptyState } from "../components/EmptyState";
 import { ErrorState } from "../components/ErrorState";
+import { IconArrowLeft } from "../components/Icons";
 import { Logo } from "../components/Logo";
 import { Money } from "../components/Money";
 import { Skeleton, SkeletonText } from "../components/Skeleton";
@@ -254,6 +255,7 @@ export default function Statement() {
     <div className="st">
       <div className="st-actions ui-no-print">
         <Link to={`/console?tab=${encodeURIComponent(tabId)}`} className={buttonClassName({ variant: "ghost", size: "sm" })}>
+          <IconArrowLeft />
           Back to the tab
         </Link>
         <Button variant="secondary" size="sm" onClick={() => window.print()} disabled={!statement.data}>
