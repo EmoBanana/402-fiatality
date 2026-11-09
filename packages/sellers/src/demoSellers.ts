@@ -33,7 +33,7 @@ const CHANNEL3_ENDPOINTS: SellerCreateDTO["endpoints"] = [
 
 export const demoSellers: DemoSellersFn = (config) => {
   const base = config.sellersBaseUrl.replace(/\/+$/, "");
-  const email = (id: DemoSellerId) => config.sellerEmails[id] ?? `${id}@sellers.p402.example`;
+  const email = (id: DemoSellerId) => config.sellerEmails[id] ?? `${id}@sellers.402fiatality.example`;
   const local = (id: DemoSellerId) => ({ baseUrl: `${base}/${id}`, authHeader: "x-api-key", apiKey: demoApiKey(id), paypalEmail: email(id) });
 
   const channel3: SellerCreateDTO = config.channel3ApiKey

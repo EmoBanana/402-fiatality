@@ -144,8 +144,8 @@ export function PayoutsGrid({ onApi }: { onApi: (api: GridApi<PayoutDTO> | null)
         cellSelection
         tooltipShowDelay={350}
         overlayComponentParams={{ noRows: { overlayText: "No payouts yet. Sellers are paid weekly once they're owed $10." } }}
-        defaultCsvExportParams={{ fileName: `p402-payouts-${fileStamp()}.csv`, processCellCallback: exportCell }}
-        defaultExcelExportParams={{ fileName: `p402-payouts-${fileStamp()}.xlsx`, sheetName: "Payouts", processCellCallback: exportCell }}
+        defaultCsvExportParams={{ fileName: `402-fiatality-payouts-${fileStamp()}.csv`, processCellCallback: exportCell }}
+        defaultExcelExportParams={{ fileName: `402-fiatality-payouts-${fileStamp()}.xlsx`, sheetName: "Payouts", processCellCallback: exportCell }}
         excelStyles={EXCEL_STYLES}
       />
     </div>

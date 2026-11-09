@@ -205,7 +205,7 @@ describe("demoSellers", () => {
     expect(list.map((s) => s.id)).toEqual(["channel3", "pricewatch", "reviews"]);
     expect(list.map((s) => s.baseUrl)).toEqual(["http://localhost:4030/channel3", "http://localhost:4030/pricewatch", "http://localhost:4030/reviews"]);
     expect(list.map((s) => s.apiKey)).toEqual(["demo-channel3-key", "demo-pricewatch-key", "demo-reviews-key"]);
-    expect(list.map((s) => s.paypalEmail)).toEqual(["channel3@sellers.p402.example", "pw@sandbox.example", "reviews@sellers.p402.example"]);
+    expect(list.map((s) => s.paypalEmail)).toEqual(["channel3@sellers.402fiatality.example", "pw@sandbox.example", "reviews@sellers.402fiatality.example"]);
     expect(list.flatMap((s) => s.endpoints.map((e) => `${e.method} ${e.path} ${e.priceMicros}`))).toEqual([
       `POST /v1/search ${DEMO_PRICES.search}`,
       `GET /v1/products/:id ${DEMO_PRICES.product}`,

@@ -172,8 +172,8 @@ export function SettlementsGrid({ onApi }: { onApi: (api: GridApi<SettlementDTO>
         overlayComponentParams={{
           noRows: { overlayText: "No settlements yet. Closing a tab makes one PayPal capture and splits the fee across its sellers." },
         }}
-        defaultCsvExportParams={{ fileName: `p402-settlements-${fileStamp()}.csv`, processCellCallback: exportCell }}
-        defaultExcelExportParams={{ fileName: `p402-settlements-${fileStamp()}.xlsx`, sheetName: "Settlements", processCellCallback: exportCell }}
+        defaultCsvExportParams={{ fileName: `402-fiatality-settlements-${fileStamp()}.csv`, processCellCallback: exportCell }}
+        defaultExcelExportParams={{ fileName: `402-fiatality-settlements-${fileStamp()}.xlsx`, sheetName: "Settlements", processCellCallback: exportCell }}
         excelStyles={EXCEL_STYLES}
       />
     </div>

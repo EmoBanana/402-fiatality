@@ -520,8 +520,8 @@ export function VouchersGrid({ feed, onApi }: VouchersGridProps) {
       return bucketText(store, p.node.rowGroupColumn?.getColId(), p.node.key);
     };
     return {
-      csv: { fileName: `p402-ious-${fileStamp()}.csv`, processCellCallback, processRowGroupCallback },
-      excel: { fileName: `p402-ious-${fileStamp()}.xlsx`, sheetName: "IOUs", processCellCallback, processRowGroupCallback },
+      csv: { fileName: `402-fiatality-ious-${fileStamp()}.csv`, processCellCallback, processRowGroupCallback },
+      excel: { fileName: `402-fiatality-ious-${fileStamp()}.xlsx`, sheetName: "IOUs", processCellCallback, processRowGroupCallback },
     };
   }, [store]);
 
