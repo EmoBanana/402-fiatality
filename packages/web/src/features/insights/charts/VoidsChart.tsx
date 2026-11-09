@@ -15,6 +15,18 @@ interface VoidDatum extends VoidReasonRow {
   dollars: number;
 }
 
+/**
+ * Band padding by category count, so one or two reasons draw as bars (about 40 px) rather than slabs that
+ * fill the plot. AG Charts caps both paddings at 1, and a single band ignores paddingInner and spans
+ * range × (1 − 2 × paddingOuter), hence its own case.
+ */
+function bandPadding(count: number): { paddingInner: number; paddingOuter: number } {
+  if (count <= 1) return { paddingInner: 0.5, paddingOuter: 0.42 };
+  if (count === 2) return { paddingInner: 0.5, paddingOuter: 1 };
+  if (count <= 4) return { paddingInner: 0.5, paddingOuter: 0.5 };
+  return { paddingInner: 0.4, paddingOuter: 0.25 };
+}
+
 export function VoidsChart({ rows, tokens }: { rows: VoidReasonRow[]; tokens: Tokens }) {
   const options = useMemo<AgCartesianChartOptions>(() => {
     const data: VoidDatum[] = rows.map((r) => ({ ...r, dollars: r.micros / 1_000_000 }));
@@ -60,8 +72,7 @@ export function VoidsChart({ rows, tokens }: { rows: VoidReasonRow[]; tokens: To
           label: { color: tokens.ink2, maxWidth: 150, wrapping: "on-space" },
           line: { enabled: false },
           gridLine: { enabled: false },
-          paddingInner: 0.5,
-          paddingOuter: 0.25,
+          ...bandPadding(data.length),
         },
         y: {
           type: "number",

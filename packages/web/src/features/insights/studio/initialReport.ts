@@ -6,6 +6,11 @@
 import type { AgReportState } from "ag-studio";
 
 const title = (text: string) => ({ title: { text, enabled: true } });
+/** A title plus a legend under the plot: for charts whose color carries a dimension (sellers, fee kinds). */
+const titleWithLegend = (text: string) => ({
+  ...title(text),
+  style: { theme: { common: { legend: { enabled: true, position: "bottom" as const } } } },
+});
 
 export const INITIAL_REPORT: AgReportState = {
   selectedPageId: "calls",
@@ -21,12 +26,14 @@ export const INITIAL_REPORT: AgReportState = {
         "kpi-latency": { type: "value", format: title("Avg latency (ms)"), dataMapping: { value: [{ id: "vouchers.latencyMs", aggregation: "avg" }] } },
         "billed-by-tab": {
           type: "column-chart-stacked",
-          format: title("Billed by tab and seller"),
+          format: titleWithLegend("Billed by tab and seller"),
           dataMapping: {
             categoryKey: [{ id: "vouchers.tab" }],
             valueKey: [{ id: "vouchers.billedUsd", aggregation: "sum" }],
             legendKey: [{ id: "vouchers.seller" }],
           },
+          // Sellers in a fixed order, so each keeps the color it has in the charts above.
+          sort: [{ field: { id: "vouchers.seller" }, direction: "asc" }],
         },
         "void-rate-by-seller": {
           type: "bar-chart-grouped",
@@ -70,7 +77,7 @@ export const INITIAL_REPORT: AgReportState = {
         "kpi-saved": { type: "value", format: title("Saved by batching"), dataMapping: { value: [{ id: "settlements.savedUsd", aggregation: "sum" }] } },
         "fees-by-tab": {
           type: "column-chart-grouped",
-          format: title("Per-call fees vs one batched charge"),
+          format: titleWithLegend("Per-call fees vs one batched charge"),
           dataMapping: {
             categoryKey: [{ id: "settlements.tab" }],
             valueKey: [
