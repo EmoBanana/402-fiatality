@@ -19,6 +19,9 @@ export interface KeyVault {
 }
 
 const FINGERPRINT_KEY = "seller_vault.key_fingerprint";
+const IV_BYTES = 12;
+/** Full-length GCM tags only: Node otherwise accepts tags truncated to 4 bytes, which are forgeable. */
+const TAG_BYTES = 16;
 
 /** 64 hex chars, or base64/base64url that decodes to exactly 32 bytes. */
 export function parseMasterKey(text: string): Buffer {
@@ -49,8 +52,8 @@ export function createKeyVault(key: Buffer): KeyVault {
   return {
     fingerprint: createHash("sha256").update(key).digest("hex").slice(0, 16),
     encrypt(plaintext, aad) {
-      const iv = randomBytes(12);
-      const cipher = createCipheriv("aes-256-gcm", key, iv);
+      const iv = randomBytes(IV_BYTES);
+      const cipher = createCipheriv("aes-256-gcm", key, iv, { authTagLength: TAG_BYTES });
       cipher.setAAD(Buffer.from(aad, "utf8"));
       const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
       return [iv, cipher.getAuthTag(), ciphertext].map((part) => part.toString("base64")).join(".");
@@ -59,7 +62,8 @@ export function createKeyVault(key: Buffer): KeyVault {
       const parts = sealed.split(".");
       if (parts.length !== 3) throw new Error("Malformed sealed value");
       const [iv, tag, ciphertext] = parts.map((part) => Buffer.from(part, "base64")) as [Buffer, Buffer, Buffer];
-      const decipher = createDecipheriv("aes-256-gcm", key, iv);
+      if (iv.length !== IV_BYTES || tag.length !== TAG_BYTES) throw new Error("Malformed sealed value");
+      const decipher = createDecipheriv("aes-256-gcm", key, iv, { authTagLength: TAG_BYTES });
       decipher.setAAD(Buffer.from(aad, "utf8"));
       decipher.setAuthTag(tag);
       return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");

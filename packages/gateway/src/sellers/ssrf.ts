@@ -41,6 +41,7 @@ for (const [net, prefix] of [
 }
 for (const [net, prefix] of [
   ["::", 96], // unspecified, loopback, IPv4-compatible
+  ["::ffff:0:0:0", 96], // IPv4-translated (SIIT): embeds any IPv4, e.g. ::ffff:0:7f00:1 = 127.0.0.1
   ["100::", 64], // discard
   ["2001::", 23], // IETF protocol assignments (Teredo, benchmarking, ORCHID)
   ["2001:db8::", 32], // documentation

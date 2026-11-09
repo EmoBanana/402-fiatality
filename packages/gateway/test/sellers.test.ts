@@ -34,6 +34,8 @@ describe("SSRF guard", () => {
       "64:ff9b::a00:1",
       "2002:a00:1::1",
       "2001:db8::1",
+      "::ffff:0:7f00:1", // IPv4-translated 127.0.0.1
+      "::ffff:0:a9fe:a9fe", // IPv4-translated 169.254.169.254
       "not-an-ip",
     ]) {
       expect(isPublicAddress(a), a).toBe(false);
@@ -51,6 +53,7 @@ describe("SSRF guard", () => {
     expect(() => checkSellerUrlShape("http://localhost:4030", false)).toThrow(/demo mode/);
     expect(() => checkSellerUrlShape("http://api.example.com", true)).toThrow(/https/);
     expect(() => checkSellerUrlShape("https://10.0.0.5/api", true)).toThrow(/not a public address/);
+    expect(() => checkSellerUrlShape("https://[::ffff:0:a9fe:a9fe]/latest", true)).toThrow(/not a public address/);
     expect(() => checkSellerUrlShape("https://user:pw@api.example.com", true)).toThrow(/credentials/);
     expect(() => checkSellerUrlShape("https://api.example.com/?x=1", true)).toThrow(/query/);
     expect(() => checkSellerUrlShape("ftp://api.example.com", true)).toThrow(/https/);
@@ -103,6 +106,15 @@ describe("seller key vault", () => {
     expect(() => vault.decrypt([iv, tag, Buffer.from("tampered").toString("base64")].join("."), "acme")).toThrow();
     expect(() => createKeyVault(parseMasterKey("cd".repeat(32))).decrypt(sealed, "acme")).toThrow();
     void ct;
+  });
+
+  it("accepts only full 16-byte GCM tags and 12-byte IVs (a 4-byte tag is forgeable)", () => {
+    const vault = createKeyVault(parseMasterKey("ab".repeat(32)));
+    const [iv, tag, ct] = vault.encrypt("demo-key", "acme").split(".") as [string, string, string];
+    const short = Buffer.from(tag, "base64").subarray(0, 4).toString("base64");
+    expect(() => vault.decrypt([iv, short, ct].join("."), "acme")).toThrow();
+    expect(() => vault.decrypt([Buffer.alloc(16).toString("base64"), tag, ct].join("."), "acme")).toThrow();
+    expect(vault.decrypt([iv, tag, ct].join("."), "acme")).toBe("demo-key");
   });
 
   it("parses hex and base64 master keys and generates data/master.key once with 0600", () => {
