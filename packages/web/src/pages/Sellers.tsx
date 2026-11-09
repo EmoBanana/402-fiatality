@@ -80,7 +80,12 @@ export default function Sellers() {
           <Card className="sl-stats" aria-label="All sellers">
             {sellers.data ? (
               <>
-                <Stat label="Owed to sellers" value={<Money micros={totals.owed} />} hint="Settled, not yet paid out" />
+                <Stat
+                  label="Owed to sellers"
+                  value={<Money micros={totals.owed} />}
+                  // Below zero only when tabs closed at a few cents: PayPal's fixed fee share outweighed them.
+                  hint={totals.owed < 0 ? "Fee shares outweighed tiny tabs" : "Settled, not yet paid out"}
+                />
                 <Stat label="Paid out" value={<Money micros={totals.paid} />} hint="Through PayPal payouts" />
                 <Stat label="Earned from calls" value={<Money micros={totals.gross} />} hint={`${formatCount(totals.calls)} paid calls`} />
                 <Stat

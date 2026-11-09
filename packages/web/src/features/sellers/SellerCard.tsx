@@ -81,7 +81,13 @@ export function SellerCard({ seller, thresholdCents, onUpdate }: { seller: Selle
           <dd>
             <Money micros={seller.balanceMicros} />
           </dd>
-          <dd className="sl-figure-hint">{due ? "In the next payout" : `Paid once owed ${formatCents(thresholdCents)}`}</dd>
+          <dd className="sl-figure-hint">
+            {seller.balanceMicros < 0
+              ? "Fee share above earnings so far"
+              : due
+                ? "In the next payout"
+                : `Paid once owed ${formatCents(thresholdCents)}`}
+          </dd>
         </div>
         <div>
           <dt>Paid out</dt>
