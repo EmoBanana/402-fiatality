@@ -28,7 +28,8 @@ function SellerCell(props: CustomCellRendererProps<SellerPulseRow>) {
 }
 
 function MicrosCell(props: CustomCellRendererProps<SellerPulseRow>) {
-  return typeof props.value === "number" ? <Money micros={props.value} /> : null;
+  // padTo lines the column up on the decimal point ($0.03 next to $0.036).
+  return typeof props.value === "number" ? <Money micros={props.value} padTo={3} /> : null;
 }
 
 const getRowId = (p: GetRowIdParams<SellerPulseRow>) => p.data.sellerId;

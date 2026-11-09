@@ -35,11 +35,13 @@ function SettlementStatusCell(props: CustomCellRendererProps<SettlementDTO>) {
   return <StatusBadgeCell value={props.value} map={SETTLEMENT_STATUS} />;
 }
 
-const money = { type: "rightAligned", cellRenderer: MoneyCell, cellClass: "tx-money", aggFunc: "sum" } satisfies ColDef;
-const cents = { type: "rightAligned", cellRenderer: CentsCell, cellClass: "tx-money", aggFunc: "sum" } satisfies ColDef;
+// A column-level cellClass replaces the rightAligned type's own class, so numeric columns list it again.
+const RIGHT = "ag-right-aligned-cell";
+const money = { type: "rightAligned", cellRenderer: MoneyCell, cellClass: [RIGHT, "tx-money"], aggFunc: "sum" } satisfies ColDef;
+const cents = { type: "rightAligned", cellRenderer: CentsCell, cellClass: [RIGHT, "tx-money"], aggFunc: "sum" } satisfies ColDef;
 const count = {
   type: "rightAligned",
-  cellClass: "tx-mono",
+  cellClass: [RIGHT, "tx-mono"],
   aggFunc: "sum",
   valueFormatter: (p: { value: unknown }) => {
     const n = numericValue(p.value);
@@ -58,7 +60,7 @@ const lineColumns: ColDef<SettlementLineDTO>[] = [
     headerName: "Seller keeps",
     width: 120,
     type: "rightAligned",
-    cellClass: "tx-mono",
+    cellClass: [RIGHT, "tx-mono"],
     valueGetter: (p) => (p.data && p.data.grossMicros > 0 ? p.data.netMicros / p.data.grossMicros : null),
     valueFormatter: (p) => (typeof p.value === "number" ? formatPct(p.value * 100, 1) : ""),
   },
@@ -110,7 +112,7 @@ export function SettlementsGrid({ onApi }: { onApi: (api: GridApi<SettlementDTO>
         headerName: "Saved",
         width: 108,
         ...cents,
-        cellClass: ["tx-money", "tx-saved"],
+        cellClass: [RIGHT, "tx-money", "tx-saved"],
         headerTooltip: "Per-call fees minus the one batched fee",
         valueGetter: (p) => (p.data ? Math.max(0, p.data.naiveFeeCents - p.data.paypalFeeCents) : undefined),
       },
@@ -119,7 +121,7 @@ export function SettlementsGrid({ onApi }: { onApi: (api: GridApi<SettlementDTO>
         headerName: "Fee rate",
         width: 100,
         type: "rightAligned",
-        cellClass: ["tx-mono", "tx-pct"],
+        cellClass: [RIGHT, "tx-mono", "tx-pct"],
         headerTooltip: "PayPal fee as a share of the charge",
         valueGetter: (p) => (p.data && p.data.chargedCents > 0 ? p.data.paypalFeeCents / p.data.chargedCents : null),
         valueFormatter: (p) => (typeof p.value === "number" ? formatPct(p.value * 100) : ""),

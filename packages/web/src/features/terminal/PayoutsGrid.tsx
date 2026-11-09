@@ -38,7 +38,9 @@ function ItemStatusCell(props: CustomCellRendererProps<PayoutItemDTO>) {
   return key ? <StatusBadgeCell value={key} map={PAYOUT_STATUS} /> : null;
 }
 
-const cents = { type: "rightAligned", cellRenderer: CentsCell, cellClass: "tx-money", aggFunc: "sum" } satisfies ColDef;
+// A column-level cellClass replaces the rightAligned type's own class, so numeric columns list it again.
+const RIGHT = "ag-right-aligned-cell";
+const cents = { type: "rightAligned", cellRenderer: CentsCell, cellClass: [RIGHT, "tx-money"], aggFunc: "sum" } satisfies ColDef;
 
 const itemColumns: ColDef<PayoutItemDTO>[] = [
   { colId: "seller", headerName: "Seller", flex: 1, minWidth: 140, valueGetter: (p) => p.data?.sellerName ?? p.data?.sellerId },
@@ -90,7 +92,7 @@ export function PayoutsGrid({ onApi }: { onApi: (api: GridApi<PayoutDTO> | null)
         headerName: "Sellers",
         width: 96,
         type: "rightAligned",
-        cellClass: "tx-mono",
+        cellClass: [RIGHT, "tx-mono"],
         aggFunc: "sum",
         valueGetter: (p) => p.data?.items.length,
         valueFormatter: (p) => {

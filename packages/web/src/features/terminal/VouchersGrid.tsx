@@ -34,6 +34,8 @@ import { ReviewDetail } from "./ReviewDetail";
 import { type TerminalStore, useTerminal, type VoucherRow } from "./store";
 
 const MINUTE = 60_000;
+// A column-level cellClass replaces the rightAligned type's own class, so numeric columns list it again.
+const RIGHT = "ag-right-aligned-cell";
 
 const GROUP_PRESETS = [
   { id: "", label: "Flat" },
@@ -117,7 +119,7 @@ function buildColumns(store: TerminalStore): ColDef<VoucherRow>[] {
   const money = {
     type: "rightAligned",
     cellRenderer: MoneyCell,
-    cellClass: "tx-money",
+    cellClass: [RIGHT, "tx-money"],
     enableValue: true,
     allowedAggFuncs: ["sum", "avg", "min", "max"],
     filter: "agNumberColumnFilter",
@@ -178,7 +180,7 @@ function buildColumns(store: TerminalStore): ColDef<VoucherRow>[] {
       colId: "status",
       field: "status",
       headerName: "Status",
-      width: 160,
+      width: 144,
       cellRenderer: StatusCell,
       enableRowGroup: true,
       enableCellChangeFlash: true,
@@ -234,7 +236,8 @@ function buildColumns(store: TerminalStore): ColDef<VoucherRow>[] {
       colId: "review",
       field: "review",
       headerName: "AI review",
-      width: 116,
+      // Wide enough for the "Agent frozen" pill (16 px moved over from Status, so the total stays put).
+      width: 132,
       cellRenderer: ReviewCell,
       enableRowGroup: true,
       enableCellChangeFlash: true,
@@ -248,7 +251,7 @@ function buildColumns(store: TerminalStore): ColDef<VoucherRow>[] {
       width: 100,
       hide: true,
       type: "rightAligned",
-      cellClass: "tx-mono",
+      cellClass: [RIGHT, "tx-mono"],
       enableValue: true,
       aggFunc: "avg",
       allowedAggFuncs: ["avg", "min", "max"],
@@ -280,7 +283,7 @@ function buildColumns(store: TerminalStore): ColDef<VoucherRow>[] {
       tooltip: (p) => p.value ?? undefined,
       ...setFilter("tabId"),
     },
-    { colId: "seq", field: "seq", headerName: "Seq", width: 84, hide: true, type: "rightAligned", cellClass: "tx-mono", filter: "agNumberColumnFilter" },
+    { colId: "seq", field: "seq", headerName: "Seq", width: 84, hide: true, type: "rightAligned", cellClass: [RIGHT, "tx-mono"], filter: "agNumberColumnFilter" },
     {
       colId: "cumulativeMicros",
       field: "cumulativeMicros",
@@ -297,7 +300,7 @@ function buildColumns(store: TerminalStore): ColDef<VoucherRow>[] {
       width: 96,
       hide: true,
       type: "rightAligned",
-      cellClass: "tx-mono",
+      cellClass: [RIGHT, "tx-mono"],
       valueFormatter: (p) => (typeof p.value === "number" ? formatCount(p.value) : ""),
       filter: "agNumberColumnFilter",
     },

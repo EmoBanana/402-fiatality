@@ -331,6 +331,18 @@
   text-overflow: ellipsis;
 }
 
+/* Accepted is the normal case: a status dot and plain text, no fill, so the filled void pills stand out.
+   Same padding as a pill, so the dots line up down the column. */
+.ui-badge.tx-ok[data-tone] {
+  background: transparent;
+  color: var(--ink-2);
+  font-weight: var(--weight-regular);
+}
+
+.ui-badge.tx-ok .ui-badge-dot {
+  background: var(--success);
+}
+
 .tx-money-void {
   color: var(--muted);
   text-decoration: line-through;

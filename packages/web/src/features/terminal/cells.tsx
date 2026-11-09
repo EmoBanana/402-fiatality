@@ -4,12 +4,15 @@ import { Badge, type BadgeTone, Money } from "../../components";
 import { numericValue, ROW_REVIEW, type RowReview, voidReasonLabel } from "./labels";
 import type { VoucherRow } from "./store";
 
-/** Money from micros (sub-cent digits muted); voided leaf rows show the price struck through. */
+/**
+ * Money from micros (sub-cent digits muted); voided leaf rows show the price struck through. Padded to three
+ * decimals so a column of $0.005 / $0.01 / $0.002 lines up on the decimal point.
+ */
 export function MoneyCell(props: CustomCellRendererProps<VoucherRow>) {
   const micros = numericValue(props.value);
   if (micros == null) return null;
   const voided = !props.node.group && props.data?.status === "voided" && props.column?.getColId() === "priceMicros";
-  return <Money micros={Math.round(micros)} className={voided ? "tx-money-void" : undefined} />;
+  return <Money micros={Math.round(micros)} padTo={3} className={voided ? "tx-money-void" : undefined} />;
 }
 
 /** Money from whole cents (settlements, payouts). */
@@ -19,11 +22,20 @@ export function CentsCell(props: CustomCellRendererProps) {
   return <Money cents={Math.round(cents)} />;
 }
 
-/** Accepted, or the void reason as a danger pill (the row itself is tinted and its price struck through). */
+/**
+ * Accepted as a quiet dot and label (the normal case), or the void reason as a filled danger pill (the row
+ * itself is tinted and its price struck through), so the exceptions are what the eye finds.
+ */
 export function StatusCell(props: CustomCellRendererProps<VoucherRow>) {
   const status = props.value as VoucherRow["status"] | undefined;
   if (!status) return null;
-  if (status === "accepted") return <Badge tone="success">Accepted</Badge>;
+  if (status === "accepted") {
+    return (
+      <Badge tone="success" dot className="tx-ok">
+        Accepted
+      </Badge>
+    );
+  }
   const reason = props.data?.voidReason;
   return (
     <Badge tone="danger" dot className="tx-reason" title={`Voided: ${reason ? voidReasonLabel(reason) : "not billed"}`}>
