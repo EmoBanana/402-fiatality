@@ -186,14 +186,21 @@ describe("X402Client", () => {
     expect(fake.vouchers.map((v) => v.cumulativeMicros)).toEqual([3_000, 6_000]);
   });
 
-  it("adopts the gateway's demo clock after voucher_expired", async () => {
-    const tabId = setup(undefined, { clockOffsetMs: 3 * 86_400_000 });
+  it("adopts the gateway's wall clock, not its fast-forwarded demo clock, after voucher_expired", async () => {
+    const tabId = setup(undefined, { wallSkewMs: 10 * 60_000, clockOffsetMs: 3 * 86_400_000 });
     const c = client(tabId);
     const first = await c.fetch(c.sellerUrl("data", "/v1/items/k1"));
     expect(first.payment?.status).toBe("accepted");
     await c.fetch(c.sellerUrl("data", "/v1/items/k2"));
     expect(fake.requests.filter((r) => r.reason === "voucher_expired")).toHaveLength(1);
     expect(fake.vouchers.map((v) => v.seq)).toEqual([1, 2]);
+  });
+
+  it("ignores a demo clock fast-forward, which voucher expiry doesn't use", async () => {
+    const tabId = setup(undefined, { clockOffsetMs: 3 * 86_400_000 });
+    const c = client(tabId);
+    expect((await c.fetch(c.sellerUrl("data", "/v1/items/f1"))).payment?.status).toBe("accepted");
+    expect(fake.requests.filter((r) => r.reason === "voucher_expired")).toHaveLength(0);
   });
 
   it("sends api headers to /api only, never to the paywall", async () => {

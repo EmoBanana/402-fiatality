@@ -206,7 +206,7 @@ export class X402Client {
   private readonly quotedExtra = new Map<string, PaymentRequirements["extra"]>();
   /** Prices learned from amount_mismatch, per "<seller> <endpointId>". */
   private readonly repriced = new Map<string, Micros>();
-  /** Gateway clock minus ours, learned after a voucher_expired (demo clock fast-forwarded). */
+  /** The gateway's wall clock minus ours, learned after a voucher_expired (the machines' clocks disagree). */
   private clockSkewMs = 0;
 
   constructor(private readonly opts: X402ClientOptions) {
@@ -370,13 +370,14 @@ export class X402Client {
   }
 
   /**
-   * Vouchers carry unix seconds from Date.now(). If the gateway judges expiry by its demo clock after a
-   * fast-forward, adopt that clock (GET /api/clock) so the retry is valid. True when the skew changed.
+   * Vouchers carry unix seconds from Date.now(), and the gateway judges expiry by its wall clock. If the two
+   * machines' clocks disagree, adopt the gateway's (GET /api/clock minus its demo fast-forward, which expiry
+   * ignores) so the retry is valid. True when the skew changed.
    */
   private async syncClock(): Promise<boolean> {
     const clock = await this.api.clock().catch(() => null);
     if (!clock) return false;
-    const skew = clock.now - Date.now();
+    const skew = clock.now - clock.offsetMs - Date.now();
     if (Math.abs(skew - this.clockSkewMs) < 30_000) return false;
     this.clockSkewMs = skew;
     return true;

@@ -85,8 +85,10 @@ export interface FakePaywallOptions {
   retryAfterSec?: number;
   /** POST /api/purchases answers 400 for data: image URLs (a strict validator). */
   rejectDataImages?: boolean;
-  /** Demo clock fast-forward: voucher expiry is judged against Date.now() + this (GET /api/clock reports it). */
+  /** Demo clock fast-forward, reported by GET /api/clock. Like the gateway, expiry ignores it. */
   clockOffsetMs?: number;
+  /** The gateway machine's wall clock minus ours: voucher expiry is judged against Date.now() + this. */
+  wallSkewMs?: number;
 }
 
 export class FakePaywall {
@@ -173,7 +175,7 @@ export class FakePaywall {
     if (method === "GET" && path === "/api/clock") {
       record(200);
       const offsetMs = this.opts.clockOffsetMs ?? 0;
-      return json(res, 200, { now: Date.now() + offsetMs, offsetMs });
+      return json(res, 200, { now: Date.now() + (this.opts.wallSkewMs ?? 0) + offsetMs, offsetMs });
     }
     if (method === "GET" && path === "/api/catalog") {
       record(200);
@@ -313,7 +315,7 @@ export class FakePaywall {
     const publicKey = this.keys.get(v.agent ?? "");
     if (!publicKey || v.tab !== this.opts.tabId || !verifyVoucher(signed, publicKey)) return deny("invalid_signature");
     if (v.seller !== seller.id || v.price !== String(endpoint.priceMicros)) return deny("amount_mismatch");
-    const nowSec = Math.floor((Date.now() + (this.opts.clockOffsetMs ?? 0)) / 1000);
+    const nowSec = Math.floor((Date.now() + (this.opts.wallSkewMs ?? 0)) / 1000);
     if (v.iat > nowSec + 30 || v.exp <= nowSec || v.exp - v.iat > 300) return deny("voucher_expired");
     if (v.reqHash !== requestHash(method, rest, raw)) return deny("invalid_voucher");
     const channel = this.channels.get(seller.id) ?? { seq: 0, cumulative: 0 };
