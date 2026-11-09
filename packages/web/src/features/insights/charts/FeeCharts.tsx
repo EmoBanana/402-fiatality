@@ -215,6 +215,8 @@ export function NaiveVsBatchedChart({ points, tokens }: { points: SettlementPoin
       .slice(-MAX_TABS)
       .reverse()
       .map((p) => ({ id: p.id, label: truncate(p.label), naive: p.naiveFeeCents / 100, batched: p.feeCents / 100, calls: p.calls }));
+    // Categories are settlement ids, so two tabs with the same name get a row each instead of sharing one.
+    const labelOf = new Map(data.map((d) => [d.id, d.label]));
     const valueLabel = {
       enabled: true,
       placement: "outside-end" as const,
@@ -240,7 +242,7 @@ export function NaiveVsBatchedChart({ points, tokens }: { points: SettlementPoin
         {
           type: "bar",
           direction: "horizontal",
-          xKey: "label",
+          xKey: "id",
           yKey: "naive",
           yName: "Per-call PayPal payments",
           fill: tokens.hairlineStrong,
@@ -252,7 +254,7 @@ export function NaiveVsBatchedChart({ points, tokens }: { points: SettlementPoin
         {
           type: "bar",
           direction: "horizontal",
-          xKey: "label",
+          xKey: "id",
           yKey: "batched",
           yName: "One batched charge",
           fill: tokens.accent,
@@ -266,7 +268,12 @@ export function NaiveVsBatchedChart({ points, tokens }: { points: SettlementPoin
         x: {
           type: "category",
           position: "left",
-          label: { color: tokens.ink2, maxWidth: 140, wrapping: "on-space" },
+          label: {
+            color: tokens.ink2,
+            maxWidth: 140,
+            wrapping: "on-space",
+            formatter: ({ value }: { value: string }) => labelOf.get(value) ?? value,
+          },
           line: { enabled: false },
           gridLine: { enabled: false },
           paddingInner: 0.35,
