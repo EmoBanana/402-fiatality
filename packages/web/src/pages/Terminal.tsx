@@ -150,7 +150,7 @@ export default function Terminal() {
       toast({ title: "Nothing to export yet", tone: "warning" });
       return;
     }
-    exportMultipleSheetsAsExcel({ data: sheets, fileName: `p402-ledger-${fileStamp()}.xlsx` });
+    exportMultipleSheetsAsExcel({ data: sheets, fileName: `402-fiatality-ledger-${fileStamp()}.xlsx` });
   };
 
   return (
