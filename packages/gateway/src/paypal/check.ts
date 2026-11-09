@@ -38,7 +38,7 @@ export interface CheckDeps {
   publicBaseUrl: string;
   /** Receives the payout; null skips the payout step. */
   payoutReceiver: string | null;
-  /** Show the approve URL and resolve true once the human says the order is approved (false = give up). */
+  /** Show the approve URL and resolve true once the order is approved (false = give up). */
   waitForApproval(orderId: string, approveUrl: string): Promise<boolean>;
   /** Called as each row is recorded (live progress). */
   onRow?(row: CheckRow): void;

@@ -7,8 +7,8 @@
  *
  * Needs the sandbox credentials in .env whatever PAYPAL_MODE says. Never prints credentials or tokens.
  */
-import { stdin, stdout } from "node:process";
-import { createInterface } from "node:readline/promises";
+import { stdout } from "node:process";
+import { setTimeout as sleep } from "node:timers/promises";
 import pino from "pino";
 import { type AppConfig, ConfigError, loadConfig, loadDotEnv } from "../src/config";
 import type { PaypalClient } from "../src/context";
@@ -32,23 +32,28 @@ function sandboxConfig(): AppConfig {
   }
 }
 
-async function promptApproval(paypal: PaypalClient, publicBaseUrl: string, orderId: string, approveUrl: string): Promise<boolean> {
+/** How often, and for how long, the check looks at the order while you approve it. */
+const APPROVAL_POLL_MS = 3_000;
+const APPROVAL_WAIT_MS = 30 * 60_000;
+
+async function awaitApproval(paypal: PaypalClient, publicBaseUrl: string, orderId: string, approveUrl: string): Promise<boolean> {
   console.log(`\n${ansi(1, "Approve the $5.00 hold in your browser:")}\n\n  ${approveUrl}\n`);
   console.log("Log in with your sandbox PERSONAL (buyer) account (developer.paypal.com → Testing Tools → Sandbox Accounts)");
   console.log(`and approve. PayPal then redirects to ${publicBaseUrl}/paypal/return; it's fine if that page doesn't load.\n`);
-  const rl = createInterface({ input: stdin, output: stdout });
-  try {
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      const answer = await rl.question(`Press Enter once you have approved it${attempt > 1 ? " (or type q to give up)" : ""}... `);
-      if (answer.trim().toLowerCase() === "q") return false;
-      const order = await paypal.getOrder(orderId);
-      if (order.status === "APPROVED") return true;
-      console.log(`  The order is ${order.status}, not APPROVED yet. Log in with the sandbox personal account and approve it.`);
+  console.log(`Waiting for the approval (up to ${APPROVAL_WAIT_MS / 60_000} min; Ctrl+C gives up)...`);
+  const deadline = Date.now() + APPROVAL_WAIT_MS;
+  while (Date.now() < deadline) {
+    // A failed lookup (network blip) just means asking again on the next poll.
+    const status = await paypal.getOrder(orderId).then((order) => order.status, () => null);
+    if (status === "APPROVED") return true;
+    if (status === "VOIDED" || status === "COMPLETED") {
+      console.log(`  The order is ${status}; it can no longer be approved.`);
+      return false;
     }
-    return false;
-  } finally {
-    rl.close();
+    await sleep(APPROVAL_POLL_MS);
   }
+  console.log("  No approval arrived in time.");
+  return false;
 }
 
 async function main(): Promise<void> {
@@ -66,7 +71,7 @@ async function main(): Promise<void> {
     tokens,
     publicBaseUrl: config.publicBaseUrl,
     payoutReceiver: config.sellerEmails.channel3,
-    waitForApproval: (orderId, approveUrl) => promptApproval(paypal, config.publicBaseUrl, orderId, approveUrl),
+    waitForApproval: (orderId, approveUrl) => awaitApproval(paypal, config.publicBaseUrl, orderId, approveUrl),
     onRow: (row) => console.log(`  ${paint(row.result, row.result.padEnd(4))}  ${row.step}: ${row.detail}${row.debugId ? `  (debug_id ${row.debugId})` : ""}`),
   });
 
