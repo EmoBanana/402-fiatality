@@ -6,6 +6,7 @@ import { AppError, type PaypalClient } from "../context";
 import { stmt } from "../db/db";
 import type { TabRow } from "../db/dto";
 import { PaypalError } from "../paypal/errors";
+import { finalizeVoucher } from "../paywall/ledger";
 import { approveMockOrder, getMockOrder, inspectMockAuthorization } from "../paypal/mock";
 import { cancelApproval, completeApproval } from "./approvals";
 import { pendingCarry } from "./store";
@@ -282,6 +283,24 @@ describe("closeTab", () => {
     setTimeout(() => stmt(h.ctx.db, "UPDATE vouchers SET status = 'accepted' WHERE id = ?").run(inFlight), 150);
     const settlement = await h.ctx.settlement.closeTab(tabId, "manual");
     expect(settlement).toMatchObject({ callCount: 11, billableMicros: 55_000, chargedCents: 5, carryOutMicros: 5_000 });
+  });
+
+  it("waits out the seller's own timeout, then voids a call still in flight so a late answer is never unbilled spend", async () => {
+    const h = createHarness();
+    const { tabId } = await openTab(h.ctx);
+    stmt(h.ctx.db, "UPDATE sellers SET void_rules = ? WHERE id = 'channel3'").run(JSON.stringify({ timeoutMs: 250 }));
+    addVouchers(h.ctx, tabId, "channel3", 10, 5_000);
+    const [late] = addVouchers(h.ctx, tabId, "channel3", 1, 5_000, { status: "pending" });
+    const started = Date.now();
+    const settlement = await h.ctx.settlement.closeTab(tabId, "manual");
+    const waitedMs = Date.now() - started;
+
+    // The seller answers after the charge: the paywall's verdict must not turn the call into accepted, unbilled spend.
+    const dto = finalizeVoucher(h.ctx, late!, { status: "accepted", voidReason: null, httpStatus: 200, latencyMs: 9_000, responseBytes: 2, responseExcerpt: "{}" });
+    expect(dto).toMatchObject({ status: "voided", voidReason: "timeout" });
+    expect(stmt(h.ctx.db, "SELECT COUNT(*) AS n FROM vouchers WHERE tab_id = ? AND status = 'accepted' AND settlement_id IS NULL").get(tabId)).toEqual({ n: 0 });
+    expect(settlement).toMatchObject({ callCount: 10, billableMicros: 50_000, chargedCents: 5, voidCount: 1 });
+    expect(waitedMs).toBeLessThan(5_000); // the seller's 250 ms timeout plus grace, not a fixed wait
   });
 
   it("resumes a settlement a crash left pending, with the same PayPal-Request-Id", async () => {

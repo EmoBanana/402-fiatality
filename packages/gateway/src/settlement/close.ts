@@ -15,8 +15,8 @@
  */
 import { newId, type SettlementDTO } from "@p402/shared";
 import { AppError, type CloseReason } from "../context";
-import { stmt, tx } from "../db/db";
-import { getSettlementDTO, type SettlementRow, type TabRow } from "../db/dto";
+import { type Db, stmt, tx } from "../db/db";
+import { getSettlementDTO, type SellerRow, type SettlementRow, type TabRow, voidRulesOf } from "../db/dto";
 import { PaypalError } from "../paypal/errors";
 import { allocateLines, estimatedFeeCents, noteToPayer, planSettlement } from "./math";
 import {
@@ -35,8 +35,8 @@ import {
   withLock,
 } from "./store";
 
-/** How long a close waits for calls that were already forwarded to a seller. */
-const IN_FLIGHT_WAIT_MS = 12_000;
+/** How long past the slowest in-flight seller's own timeout a close waits for its calls to be judged. */
+const IN_FLIGHT_GRACE_MS = 1_000;
 
 export function latestSettlement(ctx: Pick<SettlementContext, "db">, tabId: string, status?: SettlementRow["status"]): SettlementRow | null {
   const sql = status
@@ -87,11 +87,20 @@ async function closeLocked(ctx: SettlementContext, tabId: string, reason: CloseR
   return completeSettlement(ctx, requireTab(db, tabId), settlement, outcome);
 }
 
+/** The paywall aborts every forwarded call after its seller's `timeoutMs`, so this is how long the tab's calls in flight can last. */
+function longestInFlightTimeoutMs(db: Db, tabId: string): number {
+  const sellers = stmt(
+    db,
+    "SELECT DISTINCT s.void_rules FROM vouchers v JOIN sellers s ON s.id = v.seller_id WHERE v.tab_id = ? AND v.status = 'pending'",
+  ).all(tabId) as Array<Pick<SellerRow, "void_rules">>;
+  return Math.max(0, ...sellers.map((s) => voidRulesOf(s).timeoutMs));
+}
+
 async function waitForInFlight(ctx: SettlementContext, tabId: string): Promise<void> {
-  const deadline = Date.now() + IN_FLIGHT_WAIT_MS;
+  const deadline = Date.now() + longestInFlightTimeoutMs(ctx.db, tabId) + IN_FLIGHT_GRACE_MS;
   while (inFlightVoucherCount(ctx.db, tabId) > 0) {
     if (Date.now() >= deadline) {
-      ctx.log.warn({ tabId }, "closing with calls still in flight; they stay unsettled");
+      ctx.log.warn({ tabId }, "closing with calls still in flight; they are voided");
       return;
     }
     await sleep(100);
@@ -101,6 +110,12 @@ async function waitForInFlight(ctx: SettlementContext, tabId: string): Promise<v
 /** Inside a transaction: claim the vouchers and record what will be charged. */
 function openSettlement(ctx: SettlementContext, tab: TabRow): SettlementRow {
   const { db } = ctx;
+  // A call still unjudged can't join this charge, and a verdict arriving after it must not make it billable.
+  stmt(
+    db,
+    `UPDATE vouchers SET status = 'voided', void_reason = 'timeout', response_excerpt = '[gateway] the tab closed before the seller answered'
+      WHERE tab_id = ? AND status = 'pending'`,
+  ).run(tab.id);
   const plan = planSettlement(unsettledGross(db, tab.id), tab.carry_in_micros);
   const voids = voidStats(db, tab.id);
   const row: SettlementRow = {
