@@ -1,7 +1,9 @@
 /**
  * Fee views.
- *  - FeeRateChart: PayPal's effective rate for one capture by tab size ($1–$100, from the shared fee math)
- *    with every settled tab plotted on it, and the $50 close threshold marked.
+ *  - FeeRateChart: PayPal's effective rate for one capture by tab size (1¢–$100, from the shared fee math)
+ *    with every settled tab plotted on it, and the $50 close threshold marked. Both axes are logarithmic:
+ *    the fixed $0.49 makes a cents-sized tab cost 1,000%+, and on linear axes one such tab flattens the
+ *    whole curve onto 0%. Log scales keep every tab at its true value, and the axis titles say so.
  *  - NaiveVsBatchedChart: per settled tab, what per-call PayPal payments would have cost in fees (context,
  *    gray) against the one batched charge (accent), values labelled at the bar tips.
  */
@@ -15,6 +17,23 @@ import type { Tokens } from "../tokens";
 import { chartTheme, formatDollars, formatDollarTick } from "./chartTheme";
 
 const CLOSE_AT_DOLLARS = 50;
+/** The smallest PayPal capture, where the curve starts: one cent. */
+const MIN_CHARGE_CENTS = 1;
+/** Rate axis: 1% to 10,000% covers every possible capture (a 1¢ charge pays 4,900%). */
+const RATE_TICKS = [1, 10, 100, 1_000, 10_000];
+
+/** Decade ticks for a log dollar axis: 1¢, 10¢, $1, $10, $100 … up to `max`. */
+function dollarDecades(max: number): number[] {
+  const ticks: number[] = [];
+  for (let power = -2; 10 ** power <= max * 1.000001; power += 1) ticks.push(10 ** power);
+  return ticks;
+}
+
+/** 1¢, 10¢, $1, $10, $100, $1K: short labels for decade ticks. */
+function formatDecadeTick(value: number): string {
+  if (value < 1) return `${Math.round(value * 100)}¢`;
+  return value >= 1_000 ? `$${formatCount(value / 1_000)}K` : `$${formatCount(value)}`;
+}
 
 /** Round up to 1, 2, 2.5 or 5 times a power of ten, for a clean axis end. */
 function niceCeiling(value: number): number {
@@ -29,13 +48,22 @@ function truncate(text: string, max = 32): string {
 
 // ---------------------------------------------------------------- effective rate by tab size
 
+interface SettledDatum extends SettlementPoint {
+  /** Direct label, set on the newest settled tab only (the rest stay in the tooltip and table). */
+  tag: string;
+}
+
 export function FeeRateChart({ points, tokens }: { points: SettlementPoint[]; tokens: Tokens }) {
   const options = useMemo<AgCartesianChartOptions>(() => {
-    const maxDollars = Math.max(100, ...points.map((p) => Math.ceil(p.dollars / 10) * 10));
-    const curve = feeCurve(maxDollars);
+    // Whole decades, so the axis ends on a labelled tick ($100, or $1K for a bigger tab).
+    const maxDollars = 10 ** Math.max(2, Math.ceil(Math.log10(Math.max(1, ...points.map((p) => p.dollars)))));
+    const curve = feeCurve(maxDollars, MIN_CHARGE_CENTS);
     const atClose = curve.find((p) => p.dollars === CLOSE_AT_DOLLARS);
-    const maxRate = Math.max(...curve.map((p) => p.rate), ...points.map((p) => p.rate));
-    const rateCeiling = Math.ceil(maxRate / 10) * 10;
+    const newest = points.at(-1);
+    const settled: SettledDatum[] = points.map((p) => ({
+      ...p,
+      tag: p === newest ? `${truncate(p.label, 24)} · ${formatPct(p.rate, p.rate >= 100 ? 0 : 1)}` : "",
+    }));
     const curveSeries = {
       type: "line" as const,
       data: curve,
@@ -45,7 +73,6 @@ export function FeeRateChart({ points, tokens }: { points: SettlementPoint[]; to
       stroke: tokens.series[0],
       strokeWidth: 2,
       marker: { enabled: false },
-      interpolation: { type: "smooth" as const },
       tooltip: {
         renderer: ({ datum }: { datum: FeeCurvePoint }) => ({
           title: `${formatDollars(datum.dollars)} tab`,
@@ -58,16 +85,18 @@ export function FeeRateChart({ points, tokens }: { points: SettlementPoint[]; to
     };
     const settledSeries = {
       type: "scatter" as const,
-      data: points,
+      data: settled,
       xKey: "dollars",
       yKey: "rate",
       yName: "Settled tabs",
+      labelKey: "tag",
       fill: tokens.series[1],
       stroke: tokens.surface,
       strokeWidth: 2,
       size: 10,
+      label: { enabled: true, placement: ["right", "top", "left"] as Array<"right" | "top" | "left">, color: tokens.ink2, fontSize: 11 },
       tooltip: {
-        renderer: ({ datum }: { datum: SettlementPoint }) => ({
+        renderer: ({ datum }: { datum: SettledDatum }) => ({
           title: datum.label,
           data: [
             { label: "Charged", value: formatDollars(datum.dollars) },
@@ -84,12 +113,13 @@ export function FeeRateChart({ points, tokens }: { points: SettlementPoint[]; to
       series: points.length > 0 ? [curveSeries, settledSeries] : [curveSeries],
       axes: {
         x: {
-          type: "number",
+          type: "log",
           position: "bottom",
-          min: 0,
+          min: MIN_CHARGE_CENTS / 100,
           max: maxDollars,
-          title: { text: "Tab size (one charge)", color: tokens.muted, fontSize: 12 },
-          label: { color: tokens.muted, formatter: ({ value }: { value: number }) => formatDollarTick(value) },
+          interval: { values: dollarDecades(maxDollars) },
+          title: { text: "Tab size, one charge (log scale)", color: tokens.muted, fontSize: 12, spacing: 12 },
+          label: { color: tokens.muted, formatter: ({ value }: { value: number }) => formatDecadeTick(value) },
           gridLine: { enabled: false },
           line: { stroke: tokens.hairlineStrong },
           crossLines: atClose
@@ -102,7 +132,8 @@ export function FeeRateChart({ points, tokens }: { points: SettlementPoint[]; to
                   lineDash: [3, 4],
                   label: {
                     text: `$50 close · ${formatPct(atClose.rate)}`,
-                    placement: "top",
+                    // Left of the line, at the top: $50 sits near the right edge of a log axis.
+                    placement: "left-top",
                     color: tokens.ink2,
                     fontSize: 11,
                   },
@@ -111,18 +142,19 @@ export function FeeRateChart({ points, tokens }: { points: SettlementPoint[]; to
             : [],
         },
         y: {
-          type: "number",
+          type: "log",
           position: "left",
-          min: 0,
-          max: rateCeiling,
-          title: { text: "Effective fee rate", color: tokens.muted, fontSize: 12 },
-          label: { color: tokens.muted, formatter: ({ value }: { value: number }) => `${value}%` },
+          min: RATE_TICKS[0],
+          max: RATE_TICKS[RATE_TICKS.length - 1],
+          interval: { values: RATE_TICKS },
+          title: { text: "Effective fee rate (log scale)", color: tokens.muted, fontSize: 12 },
+          label: { color: tokens.muted, formatter: ({ value }: { value: number }) => `${formatCount(value)}%` },
           gridLine: { style: [{ stroke: tokens.hairline }] },
           line: { enabled: false },
         },
       },
       legend: { position: "bottom", item: { label: { color: tokens.ink2 } } },
-      padding: { top: 20, right: 12 },
+      padding: { top: 20, right: 16 },
       animation: { enabled: false },
     };
   }, [points, tokens]);
@@ -130,8 +162,9 @@ export function FeeRateChart({ points, tokens }: { points: SettlementPoint[]; to
 }
 
 export function FeeRateTable({ points }: { points: SettlementPoint[] }) {
-  const sample = [100, 500, 1_000, 2_000, 5_000, 10_000];
-  const curve = feeCurve(100).filter((p) => sample.includes(Math.round(p.dollars * 100)));
+  // The same range as the chart: from a 1¢ charge up to $100, in cents.
+  const sample = [1, 10, 50, 100, 500, 1_000, 2_000, 5_000, 10_000];
+  const curve = feeCurve(100, MIN_CHARGE_CENTS).filter((p) => sample.includes(Math.round(p.dollars * 100)));
   return (
     <div className="ins-table-stack">
       <Table

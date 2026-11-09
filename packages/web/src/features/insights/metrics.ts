@@ -164,13 +164,17 @@ export interface FeeCurvePoint {
   feeCents: number;
 }
 
-/** The effective-rate curve for one PayPal capture, $1 to `maxDollars`, from the shared fee math. */
-export function feeCurve(maxDollars = 100): FeeCurvePoint[] {
+/**
+ * The effective-rate curve for one PayPal capture, `fromCents` (default $1) to `maxDollars`, from the shared
+ * fee math. Below $1 it steps one cent at a time, so a log-scaled axis gets an even curve.
+ */
+export function feeCurve(maxDollars = 100, fromCents = 100): FeeCurvePoint[] {
   const points: FeeCurvePoint[] = [];
   const push = (cents: number) => {
     const feeCents = captureFeeCents(cents);
     points.push({ dollars: cents / 100, rate: effectiveRatePct(feeCents, cents), feeCents });
   };
+  for (let cents = Math.max(1, fromCents); cents < 100; cents += 1) push(cents);
   for (let cents = 100; cents < 1_000; cents += 25) push(cents);
   for (let cents = 1_000; cents <= maxDollars * 100; cents += 100) push(cents);
   return points;
