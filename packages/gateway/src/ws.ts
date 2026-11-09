@@ -5,9 +5,9 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 // Types for the `websocket: true` route option; server.ts registers the plugin itself.
 import type {} from "@fastify/websocket";
-import type { AppContext, RoutePlugin } from "./context";
+import type { RoutePlugin } from "./context";
+import { originAllowed } from "./http/guards";
 import { metricsSummary } from "./metrics/metrics";
-import { isLocalHostname } from "./sellers/ssrf";
 
 export const METRICS_INTERVAL_MS = 1_000;
 /** A client this far behind is dropped rather than buffered without bound. */
@@ -21,17 +21,6 @@ interface Socket {
   send(data: string): void;
   close(code?: number, reason?: string): void;
   on(event: "close" | "error" | "message", listener: (...args: unknown[]) => void): void;
-}
-
-export function originAllowed(ctx: AppContext, origin: string | undefined): boolean {
-  if (!origin) return true; // not a browser
-  if (origin === ctx.config.webBaseUrl || origin === ctx.config.publicBaseUrl) return true;
-  if (!ctx.config.demo) return false;
-  try {
-    return isLocalHostname(new URL(origin).hostname);
-  } catch {
-    return false;
-  }
 }
 
 export function createEventRoutes(opts: { metricsIntervalMs?: number } = {}): RoutePlugin {
@@ -75,7 +64,7 @@ export function createEventRoutes(opts: { metricsIntervalMs?: number } = {}): Ro
     });
 
     const checkOrigin = async (request: FastifyRequest, reply: FastifyReply) => {
-      if (!originAllowed(ctx, request.headers.origin)) {
+      if (!originAllowed(ctx.config, request.headers.origin)) {
         return reply.code(403).send({ error: "forbidden", message: "This origin may not open the event stream." });
       }
     };

@@ -2,9 +2,37 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { FastifyReply, FastifyRequest, onRequestHookHandler, onSendHookHandler } from "fastify";
 import { AppError, type AppConfig } from "../context";
+import { isLocalHostname } from "../sellers/ssrf";
 
 export const ADMIN_HEADER = "x-p402-admin";
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/**
+ * The path a request is routed by: the matched route's pattern ("/api/tabs/:id/close") when there is one. The
+ * router decodes percent-escapes, so checks on the raw URL could be dodged with spellings like "/%61pi/...".
+ */
+export function routePath(request: FastifyRequest): string {
+  return request.routeOptions?.url ?? request.url.split("?")[0] ?? "";
+}
+
+export function isApiPath(path: string): boolean {
+  return path === "/api" || path.startsWith("/api/");
+}
+
+/**
+ * Browsers always send Origin on writes; agents, scripts and tests send none. Allowed: the web app, the gateway
+ * itself and, in demo mode, any localhost origin.
+ */
+export function originAllowed(config: Pick<AppConfig, "demo" | "webBaseUrl" | "publicBaseUrl">, origin: string | undefined): boolean {
+  if (!origin) return true; // not a browser
+  if (origin === config.webBaseUrl || origin === config.publicBaseUrl) return true;
+  if (!config.demo) return false;
+  try {
+    return isLocalHostname(new URL(origin).hostname);
+  } catch {
+    return false;
+  }
+}
 
 /** Paths that belong to the API, the paywall, the event stream and the PayPal return pages (never the SPA). */
 export function isServicePath(url: string): boolean {
@@ -27,12 +55,19 @@ export function secretsEqual(given: string, expected: string): boolean {
   return timingSafeEqual(a, b) && given.length === expected.length;
 }
 
-/** With DEMO_MODE=0 every non-GET/HEAD/OPTIONS request under /api needs `x-p402-admin: <ADMIN_TOKEN>`. */
-export function adminGuard(config: Pick<AppConfig, "demo" | "adminToken">): onRequestHookHandler {
+/**
+ * With DEMO_MODE=0 every non-GET/HEAD/OPTIONS request under /api needs `x-p402-admin: <ADMIN_TOKEN>`. Demo mode
+ * needs no token, so there writes from browsers on other sites (cross-site forms, DNS rebinding) are refused.
+ */
+export function adminGuard(config: Pick<AppConfig, "demo" | "adminToken" | "webBaseUrl" | "publicBaseUrl">): onRequestHookHandler {
   return async (request: FastifyRequest) => {
-    if (config.demo || SAFE_METHODS.has(request.method)) return;
-    const path = request.url.split("?")[0] ?? "";
-    if (path !== "/api" && !path.startsWith("/api/")) return;
+    if (SAFE_METHODS.has(request.method) || !isApiPath(routePath(request))) return;
+    if (config.demo) {
+      if (!originAllowed(config, request.headers.origin)) {
+        throw new AppError(403, "forbidden_origin", "This origin may not change the gateway: use the 402 Fiatality console.");
+      }
+      return;
+    }
     const given = request.headers[ADMIN_HEADER];
     if (typeof given !== "string" || !config.adminToken || !secretsEqual(given, config.adminToken)) {
       throw new AppError(401, "unauthorized", `This gateway is not in demo mode: send the ${ADMIN_HEADER} header with the admin token.`);

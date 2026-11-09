@@ -89,9 +89,34 @@ describe("security plugins", () => {
     expect(clock).toMatchObject({ status: 403, body: { error: "demo_only" } });
   });
 
+  it("guards percent-encoded spellings of /api the router still matches", async () => {
+    h = await createHarness({ config: { demo: false, adminToken: "s3cret-admin" }, withSeller: false });
+    for (const url of ["/%61pi/companies", "/%61%70%69/companies", "/%61pi/payouts/run"]) {
+      expect(await injectJson(h.app, "POST", url, { name: "Evil Co" })).toMatchObject({ status: 401, body: { error: "unauthorized" } });
+    }
+    expect((await injectJson(h.app, "GET", "/api/companies")).body).toEqual([]);
+    expect((await injectJson(h.app, "POST", "/%61pi/companies", { name: "A" }, { "x-p402-admin": "s3cret-admin" })).status).toBe(201);
+  });
+
   it("does not need the token in demo mode", async () => {
     h = await createHarness({ withSeller: false });
     expect((await injectJson(h.app, "POST", "/api/companies", { name: "A" })).status).toBe(201);
+  });
+
+  it("refuses writes from other sites' browsers in demo mode (cross-site forms, DNS rebinding)", async () => {
+    h = await createHarness({ withSeller: false });
+    for (const origin of ["https://evil.example", "http://rebound.example:4020", "null"]) {
+      const res = await h.app.inject({ method: "POST", url: "/api/payouts/run", headers: { origin } });
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toMatchObject({ error: "forbidden_origin" });
+      expect((await injectJson(h.app, "POST", "/%61pi/companies", { name: "Evil Co" }, { origin })).status).toBe(403);
+    }
+    expect((await injectJson(h.app, "GET", "/api/companies", undefined, { origin: "https://evil.example" })).body).toEqual([]);
+    // The web app, the gateway itself, other localhost origins and non-browser clients (no Origin) still work.
+    for (const origin of ["http://localhost:5173", "http://localhost:4020", "http://127.0.0.1:4173", undefined]) {
+      const res = await injectJson(h.app, "POST", "/api/companies", { name: "A" }, origin ? { origin } : {});
+      expect(res.status).toBe(201);
+    }
   });
 
   it("limits CORS to the web app and sets security headers (no CSP on JSON)", async () => {
@@ -115,6 +140,7 @@ describe("security plugins", () => {
     for (let i = 0; i < 3; i++) expect((await injectJson(h.app, "GET", "/api/config")).status).toBe(200);
     const limited = await injectJson(h.app, "GET", "/api/config");
     expect(limited).toMatchObject({ status: 429, body: { error: "rate_limited" } });
+    expect((await injectJson(h.app, "GET", "/%61pi/config")).status).toBe(429);
     for (let i = 0; i < 5; i++) expect((await h.app.inject({ method: "GET", url: "/s/acme/v1/q/ok" })).statusCode).toBe(402);
   });
 });

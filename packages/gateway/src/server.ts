@@ -13,7 +13,7 @@ import Fastify, { LogController, type FastifyInstance } from "fastify";
 import { AppError, type AppContext, type RoutePlugin } from "./context";
 import { createCore, type CoreOptions } from "./core";
 import { errorHandler } from "./http/errors";
-import { ADMIN_HEADER, adminGuard, isServicePath, webPageHeaders } from "./http/guards";
+import { ADMIN_HEADER, adminGuard, isApiPath, isServicePath, routePath, webPageHeaders } from "./http/guards";
 import { paywallRoutes } from "./paywall/route";
 import { agentRoutes } from "./routes/agents";
 import { aiRoutes } from "./routes/ai";
@@ -78,7 +78,7 @@ export async function buildServer(ctx: AppContext, opts: BuildServerOptions = {}
     timeWindow: "1 minute",
     // The key is computed before allowList runs, so it must cope with requests that have no socket address.
     keyGenerator: (request) => request.ip || request.socket?.remoteAddress || "local",
-    allowList: (request) => !(request.url === "/api" || request.url.startsWith("/api/")),
+    allowList: (request) => !isApiPath(routePath(request)),
     errorResponseBuilder: (_request, context) => new AppError(429, "rate_limited", `Too many requests: try again in ${context.after}.`),
   });
   // After CORS and the rate limit, so a 401 still carries CORS headers and floods are limited first.
