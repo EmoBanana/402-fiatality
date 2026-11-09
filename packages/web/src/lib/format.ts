@@ -28,9 +28,13 @@ export function formatCount(n: number): string {
   return countFormat.format(n);
 }
 
-/** 4.4812 -> "4.48%" (digits = decimals). */
+/**
+ * 4.4812 -> "4.48%" (digits = decimals). From 100% up the decimals go and thousands are grouped, so a
+ * cents-sized tab's fee rate reads "1,225%" (not "1225.00%") and lines up with "980%" in a column.
+ */
 export function formatPct(value: number, digits = 2): string {
-  return `${value.toFixed(digits)}%`;
+  const decimals = Math.abs(value) >= 100 ? 0 : digits;
+  return `${value.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}%`;
 }
 
 /** 14:03:21 */

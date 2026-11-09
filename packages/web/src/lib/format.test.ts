@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, modelLabel, shortId } from "./format";
+import { formatDuration, formatPct, modelLabel, shortId } from "./format";
 
 describe("format", () => {
+  it("formats percentages, dropping decimals from 100% up and grouping thousands", () => {
+    expect(formatPct(4.4812)).toBe("4.48%");
+    expect(formatPct(12.5, 1)).toBe("12.5%");
+    expect(formatPct(99.5, 1)).toBe("99.5%");
+    expect(formatPct(0, 0)).toBe("0%");
+    expect(formatPct(980)).toBe("980%");
+    expect(formatPct(983.5, 1)).toBe("984%");
+    expect(formatPct(1225)).toBe("1,225%");
+    expect(formatPct(4900, 1)).toBe("4,900%");
+  });
+
   it("rolls durations over instead of printing 24 h or 60 min", () => {
     expect(formatDuration(850)).toBe("850 ms");
     expect(formatDuration(59_600)).toBe("1 min");
