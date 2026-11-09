@@ -83,7 +83,8 @@ export function buildFacts(input: SpendReviewInput, a: VoucherAnalysis = analyze
   const t = tab.totals;
   const p = tab.policy;
   const lines = [
-    `Alarm: ${alarm.kind}: ${clean(alarm.message, 200)}`,
+    // Only the kind: the alarm's message quotes the agent's request (path and query), so it goes in the evidence.
+    `Alarm: ${alarm.kind}`,
     `Tab: hold ${formatCents(tab.holdCents)}, billable ${formatUsd(t.billableMicros)} over ${plural(t.calls, "call")} ` +
       `(${t.accepted} accepted, ${t.voided} voided), ${formatUsd(t.remainingMicros)} left. ` +
       `Limits: ${formatUsd(p.perCallMaxMicros)} per call, ${formatUsd(p.dailyCapMicros)} per day, ${p.maxCallsPerMinute} calls a minute.`,
@@ -106,6 +107,7 @@ export function buildEvidence(input: SpendReviewInput, maxCalls = 20): string {
   const calls = input.vouchers.slice(-maxCalls);
   const lines: string[] = [];
   lines.push(`Agent task: ${input.task ? `"${clean(input.task, 300)}"` : "(unknown)"}`);
+  lines.push(`Alarm message: ${clean(input.alarm.message, 200)}`);
   const detail = Object.keys(input.alarm.detail ?? {}).length ? clean(JSON.stringify(input.alarm.detail), 300) : "";
   if (detail) lines.push(`Alarm detail: ${detail}`);
   lines.push("Calls (oldest first):");
