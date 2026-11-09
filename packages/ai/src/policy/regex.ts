@@ -49,7 +49,7 @@ const MONEY_RE = new RegExp(
 type MoneyKind = "perCall" | "daily" | "close" | "week" | "month" | "hold";
 
 const PER_CALL_AFTER = /^\s*(?:(?:per|a|an|each|every|\/)\s*(?:single\s+|api\s+|paid\s+)?(?:call|request|query|lookup|hit)s?\b|per[-\s]call\b)/;
-const PER_CALL_BEFORE = /(?:per[-\s]?call|each\s+call|every\s+call|single\s+call|one\s+call|per[-\s]?request|each\s+request|any\s+call|a\s+call)\b[^$\d]{0,30}$/;
+const PER_CALL_BEFORE = /(?:per[-\s]?call|each\s+call|every\s+call|single\s+call|one\s+call|per[-\s]?request|each\s+request|any\s+call|a\s+call|no\s+(?:api\s+|paid\s+)?(?:call|request))\b[^$\d]{0,30}$/;
 const DAILY_AFTER = /^\s*(?:(?:per|a|an|each|every|\/)\s*day\b|daily\b|per\s+24\s*h)/;
 const DAILY_BEFORE = /(?:daily|per[-\s]?day|a\s+day|each\s+day|every\s+day)\s*(?:cap|limit|max(?:imum)?|budget|spend(?:ing)?|ceiling)?\s*(?:of|at|is|to|=|:)?\s*(?:up\s+to|at\s+most|no\s+more\s+than|max(?:imum)?)?\s*$/;
 const CLOSE_BEFORE = /(?:close|charge|settle|bill|capture)\s+(?:the\s+tab\s+|it\s+)?(?:at|after|once\s+(?:it\s+)?(?:hits|reaches)|when\s+(?:it\s+)?(?:hits|reaches))\s*$/;
@@ -115,12 +115,15 @@ interface MoneyMention {
 function moneyMentions(text: string): MoneyMention[] {
   const lower = text.toLowerCase();
   const out: MoneyMention[] = [];
+  let prevEnd = 0;
   for (const match of text.matchAll(MONEY_RE)) {
-    const micros = toMicros(match.groups ?? {});
-    if (micros === null || micros <= 0) continue;
     const start = match.index ?? 0;
     const end = start + match[0].length;
-    const before = lower.slice(Math.max(0, start - 48), start);
+    // Cue words never reach back past the previous amount ("no call over half a cent, $5 total").
+    const before = lower.slice(Math.max(prevEnd, start - 48), start);
+    prevEnd = end;
+    const micros = toMicros(match.groups ?? {});
+    if (micros === null || micros <= 0) continue;
     const after = lower.slice(end, end + 40);
     out.push({ micros, kind: classify(before, after) });
   }

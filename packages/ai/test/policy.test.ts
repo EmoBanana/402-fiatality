@@ -48,6 +48,8 @@ describe("regex policy parser", () => {
     ["each call under 1 cent", { perCallMaxMicros: 10_000 }],
     ["half a cent per request", { perCallMaxMicros: 5_000 }],
     ["$0.004 a call", { perCallMaxMicros: 4_000 }],
+    ["Up to $50 this week. No call over 2 cents, $10 a day at most", { perCallMaxMicros: 20_000, holdCents: 5_000, dailyCapMicros: 10_000_000 }],
+    ["no request above half a cent, $5 total", { perCallMaxMicros: 5_000, holdCents: 500 }],
     ["only reviews", { allowedSellers: ["reviews"] }],
     ["use anything but not reviews", { allowedSellers: ["channel3", "pricewatch"] }],
     ["30 calls a minute", { maxCallsPerMinute: 30 }],
