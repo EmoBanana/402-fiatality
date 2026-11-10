@@ -46,6 +46,8 @@ export interface CheckDeps {
   sleep?(ms: number): Promise<void>;
 }
 
+const hasPayoutsScope = (scope: string) => scope.includes("/services/payments/payouts");
+
 const issueText = (err: PaypalError) => [err.paypalName, ...err.issues.flatMap((i) => [i.issue, i.description ?? ""])].join(" ");
 
 /** A disabled partial capture shows up as a 422 (or 403) whose issue mentions partial or multiple captures. */
@@ -82,11 +84,12 @@ export async function runPaypalCheck(deps: CheckDeps): Promise<CheckReport> {
   const report = (): CheckReport => ({ rows, partialCapture, failed: rows.filter((r) => r.result === "FAIL").length });
 
   // 1. OAuth
+  let payoutsScope = false;
   try {
     const token = await tokens.get();
     const minutes = Math.max(0, Math.round((token.expiresAt - Date.now()) / 60_000));
     record("OAuth token", "PASS", `client-credentials token issued (valid ~${minutes} min)`);
-    const payoutsScope = token.scope.includes("/services/payments/payouts");
+    payoutsScope = hasPayoutsScope(token.scope);
     record(
       "Payouts permission",
       payoutsScope ? "PASS" : "WARN",
@@ -189,8 +192,14 @@ export async function runPaypalCheck(deps: CheckDeps): Promise<CheckReport> {
 
   // 4. Payout
   if (!deps.payoutReceiver) {
-    record("Payout", "SKIP", "set SELLER_PAYPAL_EMAIL_CHANNEL3 to a sandbox personal account email to test payouts");
+    record("Payout", "SKIP", "set SELLER_PAYPAL_EMAIL_CHANNEL3 to a sandbox account email to test payouts");
     return report();
+  }
+  if (!payoutsScope) {
+    // Payouts may have been enabled on the app while the hold waited for approval: only a new token shows it.
+    tokens.invalidate();
+    const fresh = await tokens.get().catch(() => null);
+    if (fresh && hasPayoutsScope(fresh.scope)) record("Payouts permission", "PASS", "enabled during the check: a new token includes the Payouts scope");
   }
   try {
     const batch = await paypal.createPayoutBatch({

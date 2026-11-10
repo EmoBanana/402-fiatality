@@ -97,6 +97,28 @@ describe("runPaypalCheck", () => {
     expect(report.rows[0]?.detail).toContain("sandbox app's credentials");
   });
 
+  it("picks up Payouts enabled on the app while the hold waited for approval", async () => {
+    let appScope = "openid";
+    let cached: Awaited<ReturnType<TokenSource["get"]>> | null = null;
+    const source: TokenSource = {
+      get: async () => (cached ??= { value: "token", expiresAt: Date.now() + 3_600_000, scope: appScope }),
+      invalidate: () => {
+        cached = null;
+      },
+    };
+    const { db, deps } = setup({ tokens: source });
+    const report = await runPaypalCheck({
+      ...deps,
+      waitForApproval: async (orderId) => {
+        appScope = "openid https://uri.paypal.com/services/payments/payouts"; // the user ticks Payouts meanwhile
+        return approveMockOrder(db, orderId) !== null;
+      },
+    });
+    expect(report.rows.filter((r) => r.step === "Payouts permission").map((r) => r.result)).toEqual(["WARN", "PASS"]);
+    expect(report.rows.at(-1)).toMatchObject({ step: "Payout status", result: "PASS" });
+    expect(report.failed).toBe(0);
+  });
+
   it("skips what it can't test", async () => {
     const { deps } = setup({ waitForApproval: async () => false, payoutReceiver: null, tokens: tokens("openid") });
     const report = await runPaypalCheck(deps);
