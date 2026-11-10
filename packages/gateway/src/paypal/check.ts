@@ -46,7 +46,8 @@ export interface CheckDeps {
   sleep?(ms: number): Promise<void>;
 }
 
-const hasPayoutsScope = (scope: string) => scope.includes("/services/payments/payouts");
+/** Sandbox tokens grant `https://uri.paypal.com/payments/payouts`; some docs spell it with `/services`. */
+const hasPayoutsScope = (scope: string) => scope.split(/\s+/).some((s) => s.endsWith("/payments/payouts"));
 
 const issueText = (err: PaypalError) => [err.paypalName, ...err.issues.flatMap((i) => [i.issue, i.description ?? ""])].join(" ");
 

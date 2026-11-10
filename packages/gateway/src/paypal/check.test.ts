@@ -8,7 +8,8 @@ import { PaypalError } from "./errors";
 import { approveMockOrder, createMockPaypal, inspectMockAuthorization } from "./mock";
 import type { TokenSource } from "./oauth";
 
-const tokens = (scope = "openid https://uri.paypal.com/services/payments/payouts"): TokenSource => ({
+// The scope as a real sandbox token lists it, next to a lookalike that isn't Payouts.
+const tokens = (scope = "openid https://uri.paypal.com/services/payments/referenced-payouts-items/readwrite https://uri.paypal.com/payments/payouts"): TokenSource => ({
   get: async () => ({ value: "token", expiresAt: Date.now() + 3_600_000, scope }),
   invalidate: () => {},
 });
@@ -110,7 +111,7 @@ describe("runPaypalCheck", () => {
     const report = await runPaypalCheck({
       ...deps,
       waitForApproval: async (orderId) => {
-        appScope = "openid https://uri.paypal.com/services/payments/payouts"; // the user ticks Payouts meanwhile
+        appScope = "openid https://uri.paypal.com/payments/payouts"; // the user ticks Payouts meanwhile
         return approveMockOrder(db, orderId) !== null;
       },
     });
@@ -120,7 +121,8 @@ describe("runPaypalCheck", () => {
   });
 
   it("skips what it can't test", async () => {
-    const { deps } = setup({ waitForApproval: async () => false, payoutReceiver: null, tokens: tokens("openid") });
+    const lookalikeOnly = tokens("openid https://uri.paypal.com/services/payments/referenced-payouts-items/readwrite");
+    const { deps } = setup({ waitForApproval: async () => false, payoutReceiver: null, tokens: lookalikeOnly });
     const report = await runPaypalCheck(deps);
     expect(report.rows.map((r) => [r.step, r.result])).toEqual([
       ["OAuth token", "PASS"],
