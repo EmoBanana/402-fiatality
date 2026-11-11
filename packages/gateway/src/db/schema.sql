@@ -1,6 +1,7 @@
 -- 402 Fiatality ledger (SPEC §4). Applied by db.ts on open; every statement must stay idempotent.
 -- Money columns are integer micro-dollars unless the name ends in _cents. Times are epoch ms (gateway clock).
--- JSON columns hold TEXT. Bump SCHEMA_VERSION in db.ts whenever a table changes.
+-- JSON columns hold TEXT. Bump SCHEMA_VERSION in db.ts whenever a table changes, and add a step to MIGRATIONS
+-- there so existing databases are upgraded in place (v2 added disputes, dispute_refunds and invoices).
 
 CREATE TABLE IF NOT EXISTS companies (
   id         TEXT PRIMARY KEY,
@@ -191,6 +192,56 @@ CREATE TABLE IF NOT EXISTS payout_items (
   paypal_item_id TEXT,
   status         TEXT NOT NULL,                  -- PayPal transaction_status, e.g. SUCCESS, UNCLAIMED
   PRIMARY KEY (payout_id, seller_id)
+);
+
+-- PayPal disputes on tab charges (Disputes API v1; MOCK-D-... in mock mode). Unlinked disputes (another capture)
+-- keep NULL settlement/tab/company ids. While status != 'RESOLVED' the linked tab's sellers' net earnings are held
+-- pro rata (amount_cents / charged_cents); once resolved, refunded_cents comes off their balances exactly once.
+CREATE TABLE IF NOT EXISTS disputes (
+  id                     TEXT PRIMARY KEY,
+  settlement_id          TEXT REFERENCES settlements(id),
+  tab_id                 TEXT REFERENCES tabs(id),
+  company_id             TEXT REFERENCES companies(id),
+  capture_id             TEXT,                         -- disputed_transactions[].seller_transaction_id
+  status                 TEXT NOT NULL,                -- OPEN | WAITING_FOR_*_RESPONSE | UNDER_REVIEW | RESOLVED | OTHER
+  reason                 TEXT NOT NULL,
+  stage                  TEXT,                         -- INQUIRY | CHARGEBACK | PRE_ARBITRATION | ARBITRATION
+  amount_cents           INTEGER NOT NULL DEFAULT 0,
+  outcome                TEXT,                         -- dispute_outcome.outcome_code
+  refunded_cents         INTEGER NOT NULL DEFAULT 0,   -- money back to the buyer, from PayPal's data
+  refund_applied_cents   INTEGER NOT NULL DEFAULT 0,   -- part of refunded_cents already deducted from sellers
+  buyer_message          TEXT,                         -- the buyer's latest message (untrusted)
+  seller_response_due_at INTEGER,
+  paypal_actions         TEXT NOT NULL DEFAULT '[]',   -- JSON string[]: what PayPal allows now (HATEOAS rels)
+  paypal_updated_at      INTEGER,                      -- PayPal's update_time (real time)
+  jury                   TEXT,                         -- JSON DisputeJuryDTO
+  actions                TEXT NOT NULL DEFAULT '[]',   -- JSON DisputeActionDTO[]
+  created_at             INTEGER NOT NULL,
+  updated_at             INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS disputes_settlement ON disputes (settlement_id);
+CREATE INDEX IF NOT EXISTS disputes_tab ON disputes (tab_id, created_at);
+CREATE INDEX IF NOT EXISTS disputes_created ON disputes (created_at);
+
+-- What each seller gave back for a dispute's refund (pro rata by gross). One row per (dispute, seller), added to
+-- in the same transaction that advances disputes.refund_applied_cents, so a refund is never deducted twice.
+CREATE TABLE IF NOT EXISTS dispute_refunds (
+  dispute_id    TEXT NOT NULL REFERENCES disputes(id),
+  seller_id     TEXT NOT NULL REFERENCES sellers(id),
+  amount_micros INTEGER NOT NULL,
+  updated_at    INTEGER NOT NULL,
+  PRIMARY KEY (dispute_id, seller_id)
+);
+
+-- A tab charge recorded as a paid PayPal invoice (PAYPAL_INVOICE_RECORDS=1; MOCK-INV-... in mock mode).
+CREATE TABLE IF NOT EXISTS invoices (
+  id             TEXT PRIMARY KEY,
+  settlement_id  TEXT NOT NULL UNIQUE REFERENCES settlements(id),
+  invoice_number TEXT NOT NULL,
+  status         TEXT NOT NULL,                        -- PayPal's invoice status, e.g. MARKED_AS_PAID
+  amount_cents   INTEGER NOT NULL,
+  url            TEXT,                                 -- payer view on paypal.com, when PayPal returns one
+  created_at     INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS purchases (

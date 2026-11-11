@@ -8,12 +8,28 @@ import Database from "better-sqlite3";
 
 export type Db = Database.Database;
 
-/** Bump whenever schema.sql changes. Older demo databases must be deleted (data/ only holds demo data). */
-export const SCHEMA_VERSION = 1;
+/** Bump whenever schema.sql changes, and add the step that upgrades older databases to MIGRATIONS. */
+export const SCHEMA_VERSION = 2;
 
 const SCHEMA_SQL = readFileSync(new URL("./schema.sql", import.meta.url), "utf8");
 
-/** Open (or create) the database and apply the schema. Pass ":memory:" for tests. */
+export interface Migration {
+  /** The version this step upgrades to. */
+  version: number;
+  description: string;
+  /**
+   * Changes to existing tables (ALTER TABLE ...). New tables and indexes need no step code: schema.sql is
+   * idempotent and is applied right after the steps, in the same transaction.
+   */
+  up?: (db: Db) => void;
+}
+
+/** In-place, additive upgrades, oldest first. A database at version n runs every step above n. */
+export const MIGRATIONS: Migration[] = [
+  { version: 2, description: "PayPal disputes, dispute refunds and invoices (new tables only)" },
+];
+
+/** Open (or create) the database and apply the schema, upgrading an older one in place. Pass ":memory:" for tests. */
 export function openDb(path: string): Db {
   if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
   const db = new Database(path);
@@ -23,15 +39,18 @@ export function openDb(path: string): Db {
   db.pragma("busy_timeout = 5000");
 
   const version = db.pragma("user_version", { simple: true }) as number;
-  if (version !== 0 && version !== SCHEMA_VERSION) {
+  if (version > SCHEMA_VERSION) {
     db.close();
     throw new Error(
-      `${path} uses schema v${version} but this build needs v${SCHEMA_VERSION}. ` +
-        `It only holds demo data: delete ${path}* and restart.`,
+      `${path} uses schema v${version}, which is newer than this build (v${SCHEMA_VERSION}). ` +
+        `Update 402 Fiatality, or delete ${path}* (it only holds demo data) and restart.`,
     );
   }
-  db.exec(SCHEMA_SQL);
-  if (version === 0) db.pragma(`user_version = ${SCHEMA_VERSION}`);
+  db.transaction(() => {
+    if (version !== 0) for (const step of MIGRATIONS) if (step.version > version) step.up?.(db);
+    db.exec(SCHEMA_SQL);
+    if (version !== SCHEMA_VERSION) db.pragma(`user_version = ${SCHEMA_VERSION}`);
+  })();
   return db;
 }
 
