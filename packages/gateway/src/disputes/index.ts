@@ -348,6 +348,10 @@ export function createDisputeService(ctx: AppContext): DisputeService {
       if (!ctx.config.demo) throw new AppError(403, "demo_only", "Settling a dispute is a demo-only action (DEMO_MODE=1, PayPal sandbox or mock).");
       const row = requireRow(disputeId);
       if (row.status === "RESOLVED") throw conflict("dispute_resolved", "This dispute is already resolved.");
+      // PayPal refuses to rule on a claim the seller accepted: it refunds the buyer and closes the case itself.
+      if (parseJson<DisputeActionDTO[]>(row.actions, []).some((a) => a.kind === "accept_claim" && a.ok)) {
+        throw conflict("claim_accepted", "The seller accepted this claim, so PayPal closes it in the buyer's favour on its own.");
+      }
       const outcome = request.outcome === "buyer" ? "BUYER_FAVOR" : "SELLER_FAVOR";
       const words = request.outcome === "buyer" ? "the buyer's" : "the seller's";
       const mode = ctx.paypal.mode === "mock" ? "mock PayPal" : "PayPal sandbox";

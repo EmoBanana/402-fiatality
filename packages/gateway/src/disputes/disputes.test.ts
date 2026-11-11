@@ -227,6 +227,18 @@ describe("disputes on a tab charge", () => {
     expect(balanceOf(h.ctx, "channel3").available).toBe(before - 1_000_000);
   });
 
+  it("leaves an accepted claim for PayPal to close instead of ruling on it", async () => {
+    const h = await harness();
+    const { settlement } = await settledTab(h);
+    const { body: dispute } = await call<DisputeDTO>(h, "POST", "/api/disputes/mock", { settlementId: settlement.id });
+    await disputesOf(h.ctx).idle();
+    // The sandbox keeps an accepted claim UNDER_REVIEW while it refunds the buyer (the mock closes it at once).
+    const accepted = [{ kind: "accept_claim", at: T0, ok: true, amountCents: 1_500, note: "Fair enough." }];
+    stmt(h.ctx.db, "UPDATE disputes SET status = 'UNDER_REVIEW', actions = ? WHERE id = ?").run(JSON.stringify(accepted), dispute.id);
+    const ruled = await call<{ error: string }>(h, "POST", `/api/disputes/${dispute.id}/adjudicate`, { outcome: "buyer" });
+    expect(ruled).toMatchObject({ status: 409, body: { error: "claim_accepted" } });
+  });
+
   it("lists disputes on other captures without linking them", async () => {
     const h = await harness();
     const order = await h.ctx.paypal.createCaptureOrder({

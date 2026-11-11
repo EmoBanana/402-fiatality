@@ -75,6 +75,8 @@ function Simulation({ dispute, onUpdate }: { dispute: DisputeDTO; onUpdate: (d: 
   const config = useGatewayConfig().data;
   const [busy, setBusy] = useState<"buyer" | "seller" | null>(null);
   if (!config?.demo || (config.paypalMode !== "sandbox" && config.paypalMode !== "mock")) return null;
+  // Once the seller accepts the claim, PayPal refunds the buyer and closes the case without a ruling.
+  if (dispute.actions.some((a) => a.kind === "accept_claim" && a.ok)) return null;
   const where = config.paypalMode === "mock" ? "In mock mode" : "In PayPal's sandbox";
 
   async function rule(outcome: "buyer" | "seller") {
