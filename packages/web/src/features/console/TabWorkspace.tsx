@@ -184,7 +184,7 @@ export function TabWorkspace({ tabId }: { tabId: string }) {
     );
     return (
       <>
-        <PageHeader eyebrow="Buyer console" title="Tab" actions={<NewTabLink />} />
+        <PageHeader eyebrow="Console" title="Tab" actions={<NewTabLink />} />
         {body}
       </>
     );
@@ -193,7 +193,7 @@ export function TabWorkspace({ tabId }: { tabId: string }) {
   if (!tab) {
     return (
       <>
-      <PageHeader eyebrow="Buyer console" title={<Skeleton width={280} height={28} />} actions={<NewTabLink />} />
+      <PageHeader eyebrow="Console" title={<Skeleton width={280} height={28} />} actions={<NewTabLink />} />
       <div className="cs-layout" aria-busy="true">
         <div className="cs-steps">
           {[1, 2, 3, 4].map((n) => (
@@ -224,7 +224,7 @@ export function TabWorkspace({ tabId }: { tabId: string }) {
   return (
     <>
       <PageHeader
-        eyebrow={`Buyer console · ${tab.companyName ?? tab.companyId}`}
+        eyebrow={`Console · ${tab.companyName ?? tab.companyId}`}
         title={tab.label || "Untitled tab"}
         description={headline(tab)}
         actions={<NewTabLink />}

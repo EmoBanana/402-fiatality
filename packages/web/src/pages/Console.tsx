@@ -86,7 +86,7 @@ export default function Console() {
       ) : (
         <>
           <PageHeader
-            eyebrow="Buyer console"
+            eyebrow="Console"
             title="Open a tab"
             description="Describe a budget in plain English, approve one PayPal hold, then let agents spend against it."
           />

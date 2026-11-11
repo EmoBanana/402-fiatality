@@ -1,5 +1,5 @@
 // Design system barrel. Component APIs are documented at the top of each file; keep them stable.
-export { AppShell, NAV_LINKS } from "./AppShell";
+export { AppShell, NAV_GROUPS, NAV_LINKS, ROLES, type ViewRole } from "./AppShell";
 export {
   AGENT_RUN_STATUS_BADGE,
   AgentRunStatusBadge,

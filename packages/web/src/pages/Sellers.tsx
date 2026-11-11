@@ -64,7 +64,6 @@ export default function Sellers() {
   return (
     <div className="sl">
       <PageHeader
-        eyebrow="Seller portal"
         title="Sellers"
         description="APIs that agents pay per call. Sellers set their prices, keep about 95% after PayPal's fee, and are paid weekly through PayPal payouts."
         actions={

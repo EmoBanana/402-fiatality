@@ -163,6 +163,66 @@
   background: var(--accent);
 }
 
+/* Nav groups by whose view the pages are: a small role caption, then its links; a short rule between groups. */
+.ui-nav-group {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.ui-nav-group + .ui-nav-group::before {
+  content: "";
+  align-self: center;
+  width: 1px;
+  height: 18px;
+  margin: 0 8px 0 6px;
+  background: var(--hairline-strong);
+}
+
+.ui-nav-role {
+  align-self: center;
+  padding: 0 2px 0 4px;
+  font-size: 10px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* "Viewing as …" above every page that has a role (AppShell). */
+.ui-viewing-as {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 2px;
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-13);
+  color: var(--ink-2);
+}
+
+.ui-viewing-as strong {
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.ui-viewing-as-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.ui-viewing-as-who {
+  color: var(--muted);
+}
+
+.ui-viewing-as-who::before {
+  content: "·";
+  margin-right: 8px;
+}
+
 .ui-shell-meta {
   margin-left: auto;
   display: flex;
@@ -240,6 +300,13 @@
   display: none;
 }
 
+/* The grouped nav needs the room on narrow laptops: the status badges step aside (the live dot stays). */
+@media (max-width: 1199px) {
+  .ui-shell-meta .ui-shell-badges {
+    display: none;
+  }
+}
+
 @media (max-width: 899px) {
   .ui-shell-bar {
     gap: var(--space-2);
@@ -262,6 +329,18 @@
   .ui-menu-panel .ui-nav {
     flex-direction: column;
     gap: 0;
+  }
+  .ui-menu-panel .ui-nav-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+  .ui-menu-panel .ui-nav-group + .ui-nav-group::before {
+    display: none;
+  }
+  .ui-menu-panel .ui-nav-role {
+    align-self: flex-start;
+    padding: var(--space-2) var(--space-1) var(--space-half);
   }
   .ui-menu-panel .ui-nav a {
     min-height: 44px;

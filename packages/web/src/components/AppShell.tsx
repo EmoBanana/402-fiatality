@@ -1,11 +1,12 @@
 /**
- * App frame: top nav (Console, Terminal, Jury, Sellers, Insights, Timeline), mode badges ("PayPal
- * sandbox|mock", "Gemma 4 · 12b"), live-connection dot and theme toggle, then the page. Mounts
- * <ToastProvider> and scroll restoration.
+ * App frame: top nav grouped by whose view each page is (Buyer: Console · Seller: Sellers · Operator: Terminal,
+ * Jury, Insights, Timeline), status badges ("PayPal", "Gemma 4"), live-connection dot and theme toggle, then a
+ * "Viewing as …" line and the page. Mounts <ToastProvider> and scroll restoration.
  *
  * Route handles (router.tsx):
  *   handle: { wide: true }          full-window width (terminal, insights, timeline)
  *   handle: { chrome: "landing" }   marketing header without live status, page draws its own sections
+ *   handle: { role: "operator" }    whose view the page is: buyer, seller or operator (the "Viewing as" line)
  * Below 900 px the nav and badges fold into a menu button (only the landing page is designed that narrow).
  */
 import { useEffect, useId, useState } from "react";
@@ -20,18 +21,35 @@ import { Logo } from "./Logo";
 import { ThemeToggle } from "./ThemeToggle";
 import { ToastProvider } from "./Toast";
 
-export const NAV_LINKS = [
-  { to: "/console", label: "Console" },
-  { to: "/terminal", label: "Terminal" },
-  { to: "/jury", label: "Jury" },
-  { to: "/sellers", label: "Sellers" },
-  { to: "/insights", label: "Insights" },
-  { to: "/timeline", label: "Timeline" },
-] as const;
+export type ViewRole = "buyer" | "seller" | "operator";
+
+/** The three parties: a company paying for its agents, an API paid per call, the gateway that clears both. */
+export const ROLES: Record<ViewRole, { label: string; who: string }> = {
+  buyer: { label: "Buyer", who: "a company's finance team, paying for its agents" },
+  seller: { label: "Seller", who: "an API that agents pay per call" },
+  operator: { label: "Operator", who: "the gateway that clears every IOU" },
+};
+
+export const NAV_GROUPS: ReadonlyArray<{ role: ViewRole; links: ReadonlyArray<{ to: string; label: string }> }> = [
+  { role: "buyer", links: [{ to: "/console", label: "Console" }] },
+  { role: "seller", links: [{ to: "/sellers", label: "Sellers" }] },
+  {
+    role: "operator",
+    links: [
+      { to: "/terminal", label: "Terminal" },
+      { to: "/jury", label: "Jury" },
+      { to: "/insights", label: "Insights" },
+      { to: "/timeline", label: "Timeline" },
+    ],
+  },
+];
+
+export const NAV_LINKS = NAV_GROUPS.flatMap((group) => group.links);
 
 interface RouteHandle {
   wide?: boolean;
   chrome?: "app" | "landing";
+  role?: ViewRole;
 }
 
 function ModeBadges() {
@@ -84,12 +102,32 @@ function ConnectionDot() {
 function Nav() {
   return (
     <nav className="ui-nav" aria-label="Main">
-      {NAV_LINKS.map((link) => (
-        <NavLink key={link.to} to={link.to}>
-          {link.label}
-        </NavLink>
+      {NAV_GROUPS.map((group) => (
+        <div key={group.role} className="ui-nav-group" role="group" aria-label={ROLES[group.role].label}>
+          <span className="ui-nav-role" aria-hidden="true">
+            {ROLES[group.role].label}
+          </span>
+          {group.links.map((link) => (
+            <NavLink key={link.to} to={link.to}>
+              {link.label}
+            </NavLink>
+          ))}
+        </div>
       ))}
     </nav>
+  );
+}
+
+/** Whose view this page is, above every page that has a role. */
+function ViewingAs({ role }: { role: ViewRole }) {
+  return (
+    <p className="ui-viewing-as" data-role={role}>
+      <span className="ui-viewing-as-dot" aria-hidden="true" />
+      <span>
+        Viewing as <strong>{ROLES[role].label}</strong>
+      </span>
+      <span className="ui-viewing-as-who">{ROLES[role].who}</span>
+    </p>
   );
 }
 
@@ -110,6 +148,7 @@ export function AppShell() {
   const handles = matches.map((m) => (m.handle ?? {}) as RouteHandle);
   const wide = handles.some((h) => h.wide);
   const landing = handles.some((h) => h.chrome === "landing");
+  const role = handles.findLast((h) => h.role)?.role;
   const navigation = useNavigation();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -178,6 +217,7 @@ export function AppShell() {
           tabIndex={-1}
           className={["ui-shell-main", wide && "ui-shell-main--wide", landing && "ui-shell-main--bleed"].filter(Boolean).join(" ")}
         >
+          {role && !landing ? <ViewingAs role={role} /> : null}
           <Outlet />
         </main>
       </div>
