@@ -12,7 +12,7 @@ This document specifies how 402 Fiatality binds the x402 v2 `batch-settlement` s
 6. [Redemption](#6-redemption)
 7. [Trust model](#7-trust-model)
 
-Reference implementation: `packages/shared/src/x402.ts` (types), `voucher.ts` (signing, request hash), `headers.ts` (encoding); `packages/gateway/src/paywall/` (verification, ledger, forwarding, quality guard); `packages/gateway/src/settlement/` (redemption); `packages/agent/src/x402Client.ts` (client).
+Reference implementation: `packages/shared/src/x402.ts` (types), `voucher.ts` (signing, request hash), `headers.ts` (encoding); `packages/gateway/src/paywall/` (verification, ledger, forwarding, quality guard); `packages/gateway/src/settlement/` (redemption); `packages/gateway/src/disputes/` (disputes on the redeemed charge); `packages/agent/src/x402Client.ts` (client).
 
 ## Overview
 
@@ -29,7 +29,7 @@ The flow:
 2. **Register agent keys.** `POST /api/tabs/{tabId}/keys` with `{ "agentId", "publicKey", "enrollToken" }`.
 3. **Learn prices.** `GET /api/catalog` lists every seller, endpoint and price; `GET /api/config` gives `paypalMode`, so the network is `paypal:<paypalMode>`. A client that knows the price pays on the first request. Otherwise it calls without payment and reads the 402 quote.
 4. **Pay per request.** The request carries `PAYMENT-SIGNATURE`. The gateway answers with the seller's response and `PAYMENT-RESPONSE`, or with 402 and `PAYMENT-REQUIRED`.
-5. **Redeem.** The tab closes with one PayPal capture. Sellers are paid with PayPal Payouts.
+5. **Redeem.** The tab closes with one PayPal capture. Sellers are paid with PayPal Payouts. If the company disputes the capture on PayPal, the stored vouchers are the evidence ([Disputes](#disputes)).
 
 Conventions:
 
@@ -345,7 +345,7 @@ The gateway keeps the ledger in SQLite (WAL mode). Money is integer micro-dollar
 | `agent_keys` | Per (tab, agent): the Ed25519 public key. |
 | `events_log` | Append-only audit of every event except metrics snapshots (`voucher.accepted`, `voucher.voided`, `tab.updated`, `settlement.completed`, ...). |
 
-- `signature` stores the `PAYMENT-SIGNATURE` header exactly as received; the nonce, `iat` and `exp` are kept only there. With `agent_keys`, any voucher can be verified again later.
+- `signature` stores the `PAYMENT-SIGNATURE` header exactly as received; the nonce, `iat` and `exp` are kept only there. With `agent_keys`, any voucher can be verified again later, and the gateway does so for every billed voucher when the charge is disputed ([Disputes](#disputes)).
 - A `pending` row exists only while its call is in flight. Pending rows are never billable, never returned by the API and never emitted as events, but they count against the hold, the daily cap and the rate limit.
 - Pending rows left by a crash are voided at startup (`upstream_unreachable`). At close, rows still pending after the grace period are voided (`timeout`).
 - Nothing is deleted. A billed voucher keeps its `settlement_id`, which links it to the one capture that paid for it.
@@ -434,35 +434,50 @@ Ledger invariant for every completed settlement: the sum of `net` plus the sum o
 
 Billable is $12.345, so PayPal captures $12.34 and $0.005 carries to the company's next tab. The fee at the published rate is $0.92 (7.46%). The same calls paid one by one would have cost $1,698.28 in fees.
 
-**Payouts.** `POST /api/payouts/run` with an optional `thresholdCents` (default 1000) pays every seller whose available balance is at least the threshold:
+**Invoice record.** With `PAYPAL_INVOICE_RECORDS=1`, a completed charge above $0 is also recorded in PayPal Invoicing v2 as a paid invoice: number `FIAT-<settlement id>`, billed to the payer of the hold, one line whose description lists each seller's calls and gross and the capture id. It is created as a draft (`PayPal-Request-Id: invoice-<settlement id>`), shared as a payer-view link rather than emailed, and marked paid. It is best effort: it never changes or delays the settlement, and the scheduler retries a failed record.
 
-- amount = the balance floored to cents, minus the 25-cent Payouts fee; sellers left with nothing are skipped;
+**Payouts.** `POST /api/payouts/run` with an optional `thresholdCents` (default 1000) pays every seller whose available balance, less what open disputes hold ([Disputes](#disputes)), is at least the threshold:
+
+- amount = that payable balance floored to cents, minus the 25-cent Payouts fee; sellers left with nothing are skipped;
 - the balances are debited (amount plus fee) in the same transaction that records the payout, before PayPal is called, so two runs can't pay twice;
 - one Payouts batch: `sender_batch_id` = the payout id (also the `PayPal-Request-Id`), one `EMAIL` item per seller with `sender_item_id` = `<payout id>:<seller id>`, note "402 Fiatality weekly payout";
 - the batch is polled briefly, then by the scheduler until it is final. Items PayPal fails, returns, blocks, refunds, reverses, denies or cancels give the amount and fee back to the seller.
+
+### Disputes
+
+The capture is an ordinary PayPal payment, so the company can dispute it on PayPal. The gateway reads disputes from the Disputes API v1 (every 2 minutes on `paypal:sandbox`, on every scheduler run on `paypal:mock`, or on demand) and links one to the tab when its disputed transaction (`seller_transaction_id`) is the settlement's `capture_id`. A dispute on any other capture is listed without a tab and changes nothing.
+
+- **The commitments are the evidence.** For every billed voucher of the charge, the gateway decodes the stored `PAYMENT-SIGNATURE`, checks that the voucher's `tab` and `reqHash` match the ledger row, and verifies the Ed25519 signature with the key registered for its `agent` on that tab. An AI jury argues the case from these facts and drafts a response; a human sends it. Evidence carries a ledger summary after the response text, all within PayPal's 2,000 characters: the capture, each seller's calls and gross, how many billed calls verify against how many enrolled keys, up to three voucher ids with the start of each request hash, the voids and the spend reviews.
+- **Hold.** While the dispute is unresolved, seller `s` has `floor(net_s × min(amount, charged_cents) / charged_cents)` held (nothing when `net_s` is zero or negative). Payouts pay the available balance less everything held.
+- **Refund.** When PayPal resolves the dispute with money back to the buyer, the refunded cents (PayPal's figure, at most `charged_cents`) are split across the charge's sellers in proportion to `gross_s`, by the same largest-remainder method, and debited from their available balances. The dispute's `refund_applied_cents` advances in the same transaction that records each seller's part in `dispute_refunds`, so a refund PayPal reports again is never deducted twice, and a larger figure later is deducted as the difference.
+- **Release.** A resolution in the seller's favour releases the hold and deducts nothing.
+
+Settlement lines are never rewritten, so the ledger invariant above still holds, and for each dispute the sum of `dispute_refunds` equals `refund_applied_cents × 10,000`. The jury, the responses and the demo-only routes are described in [ARCHITECTURE.md](ARCHITECTURE.md#paypal-disputes-and-the-ai-jury).
 
 ## 7. Trust model
 
 | Party | Trusts | For | Bounded by |
 |---|---|---|---|
-| Company | PayPal | Holding and capturing its funds | PayPal's authorization rules; one charge on its own account, under PayPal's usual dispute process. |
+| Company | PayPal | Holding and capturing its funds | PayPal's authorization rules; one charge on its own account, which it can dispute like any PayPal payment. |
 | Company | Gateway operator | Enforcing its policy, applying sellers' void rules, charging only accepted calls | The hold caps the charge. Every billed call is backed by a voucher only its agent could sign. The statement shows the charge, each seller's share, the voids and the fees, and every call stays in the ledger. |
 | Company | Its agents | Spending sensibly | Policy limits, spend alarms, AI review, freezing. A leaked agent key can spend only within the tab's limits until the tab is frozen. |
-| Seller | Gateway operator | Forwarding paid calls, collecting, paying out | Its own published void rules; the voucher id on every forwarded request; its earnings per settlement and payout (`GET /api/sellers/{id}/earnings`). |
+| Seller | Gateway operator | Forwarding paid calls, collecting, paying out | Its own published void rules; the voucher id on every forwarded request; its earnings per settlement and payout (`GET /api/sellers/{id}/earnings`). In a dispute, only the disputed share of its net from that charge is held, and a refund comes off its balance in proportion to its gross on that charge, once. |
 | Gateway | Agents | Authorizing each charge | Ed25519 signatures over the exact request, price and position. |
 | Everyone | The AI reviewer | Judging alarms quickly | It can only resume, void accepted and unsettled calls of the paused tab, freeze that tab, or escalate. It cannot move money, change a policy or touch another tab. Below 0.6 confidence, on error or on timeout, a human decides. |
+| Everyone | The AI dispute jury | Drafting the response to a dispute | It only recommends: a human sends every response, PayPal decides, and balances move only on PayPal's outcome. The buyer's message is untrusted evidence, never an instruction. |
 
 What the signatures guarantee:
 
 - Only keys registered on the tab, which needs the tab's enroll token, can create billable calls.
 - Every billed call matches one signed voucher for that exact request, seller and price, and each voucher is billed at most once.
 - On each channel, what can be billed never exceeds the latest signed `cumulative`.
-- Any voucher can be checked again later from the stored header and the registered key.
+- Any voucher can be checked again later from the stored header and the registered key. When the charge is disputed, the gateway checks every billed voucher this way, which shows that each billed call was authorized by a key enrolled on the company's own tab.
 
 What they don't:
 
-- Whether a response was good enough to pay for is judged by the gateway under the seller's published rules, and on alarms by the AI review or a human. The gateway keeps request and response excerpts and the review transcript as evidence, but the operator is trusted to apply the rules honestly.
-- Funds are held by the operator. The capture lands in the gateway's own PayPal account, which pays sellers through Payouts. PayPal orders with several payees require intent `CAPTURE` instead of `AUTHORIZE` and allow at most 10 purchase units, each a separate transaction with its own fee, so a shared hold has to settle into one clearing account.
+- Whether a response was good enough to pay for is judged by the gateway under the seller's published rules, and on alarms by the AI review or a human. The gateway keeps request and response excerpts and the review transcript as evidence, but the operator is trusted to apply the rules honestly. In a dispute the signatures prove authorization, not quality, and PayPal decides.
+- Funds are held by the operator. The capture lands in the gateway's own PayPal account, which pays sellers through Payouts. PayPal orders with several payees require intent `CAPTURE` instead of `AUTHORIZE` and allow at most 10 purchase units, each a separate transaction with its own fee, so a shared hold has to settle into one clearing account. Disputes and refunds therefore land on that account too, and the gateway passes them to the sellers as in [Disputes](#disputes).
+- A hold covers only earnings not yet paid out. A dispute that arrives after a payout leaves the seller's balance below zero once refunded, until later earnings cover it; the operator carries that gap meanwhile.
 - Sellers see the forwarded request (allow-listed headers only, with their own API key injected by the gateway) and the voucher id. They never see the agent's signature or the company's PayPal details.
 
 ## Void rules

@@ -1,6 +1,6 @@
 # Architecture
 
-402 Fiatality is a TypeScript monorepo (npm workspaces, ESM, Node 22.12 or newer). A Fastify gateway owns the money: it serves the x402 paywall, keeps the voucher ledger in SQLite, enforces each tab's policy, raises spend alarms and runs the AI review, and talks to PayPal. A React app shows it all live over a WebSocket. Node packages run their TypeScript source directly through tsx; only the web app is built.
+402 Fiatality is a TypeScript monorepo (npm workspaces, ESM, Node 22.12 or newer). A Fastify gateway owns the money: it serves the x402 paywall, keeps the voucher ledger in SQLite, enforces each tab's policy, raises spend alarms and runs the AI review, talks to PayPal, and brings PayPal disputes on its charges before an AI jury. A React app shows it all live over a WebSocket. Node packages run their TypeScript source directly through tsx; only the web app is built.
 
 This document is for technical reviewers. The wire protocol is in [BINDING.md](BINDING.md); the original blueprint is [SPEC.md](SPEC.md).
 
@@ -9,8 +9,8 @@ This document is for technical reviewers. The wire protocol is in [BINDING.md](B
 | Package | Owns | Main modules |
 |---|---|---|
 | `packages/shared` | The contracts every package uses: money math in integer micro-dollars and PayPal's fee functions, the x402 types, Ed25519 vouchers and the request hash, policies and void rules with their zod schemas, REST DTOs, event types. Node-only code (signing, header encoding) sits behind a separate entry point so the browser never loads it. | `money.ts`, `x402.ts`, `voucher.ts`, `headers.ts`, `policy.ts`, `voidRules.ts`, `api.ts`, `events.ts` |
-| `packages/gateway` | The server: configuration, the dependency-injection context, the SQLite ledger, the event bus and `/ws`, the seller registry, the paywall, alarms, the review runner, in-process agent runs, both PayPal clients, settlement, the REST API, metrics. | `src/config.ts`, `context.ts`, `services.ts`, `server.ts`, `core.ts`, `paywall/`, `sellers/`, `alarms/`, `review/`, `agents/`, `paypal/`, `settlement/`, `routes/`, `db/`, `events/`, `ws.ts` |
-| `packages/ai` | LLM clients (Ollama, OpenAI-compatible, offline mock) behind one interface, and the AI service: policy parsing, the spend review, grid queries, the chat proxy. | `llm/`, `policy/`, `review/`, `grid/`, `chat/`, `service.ts`, `scripts/check-llm.ts` |
+| `packages/gateway` | The server: configuration, the dependency-injection context, the SQLite ledger, the event bus and `/ws`, the seller registry, the paywall, alarms, the review runner, in-process agent runs, both PayPal clients, settlement and invoice records, PayPal disputes, the REST API, metrics. | `src/config.ts`, `context.ts`, `services.ts`, `server.ts`, `core.ts`, `paywall/`, `sellers/`, `alarms/`, `review/`, `agents/`, `paypal/`, `settlement/`, `disputes/`, `routes/`, `db/`, `events/`, `ws.ts` |
+| `packages/ai` | LLM clients (Ollama, OpenAI-compatible, offline mock) behind one interface, and the AI service: policy parsing, the spend review, the dispute jury, grid queries, the chat proxy. | `llm/`, `policy/`, `review/`, `dispute/`, `grid/`, `chat/`, `service.ts`, `scripts/check-llm.ts` |
 | `packages/agent` | The x402 client and the shopping agent (modes llm, scripted, runaway), plus its CLI. | `x402Client.ts`, `session.ts`, `modes/`, `planner.ts`, `prompt.ts`, `cli.ts` |
 | `packages/sellers` | Three demo seller APIs on one Fastify server, and their listings for the gateway's seeder. | `app.ts`, `channel3.ts`, `pricewatch.ts`, `reviews.ts`, `catalog.ts`, `demoSellers.ts` |
 | `packages/web` | The React 19 + Vite dashboard. | `pages/`, `features/`, `components/`, `lib/` |
@@ -19,7 +19,7 @@ Internally the packages are scoped `@p402/*`. Dependencies point one way:
 
 - Every package uses `packages/shared`; the web app imports only its browser-safe entry.
 - The gateway's contracts (`PaypalClient`, `SettlementService`, `AiService`, `LlmClient`, `RunAgent`, the demo-seller functions) live in `packages/gateway/src/context.ts`. The ai, agent and sellers packages implement them and import them as types only. They also reuse the gateway's config loader for their CLIs and servers.
-- The gateway imports the ai, agent and sellers implementations in exactly one file, `src/services.ts`, the composition root. Everything else reaches them through the context, so tests swap in fakes.
+- The gateway imports the ai, agent and sellers implementations in one file, `src/services.ts`, the composition root; elsewhere it uses only two small helpers from the ai package (`warmUp` at startup, `isLlmError` in the AI routes). Everything else reaches them through the context, so tests swap in fakes.
 
 ## Processes and ports
 
@@ -138,23 +138,74 @@ stateDiagram-v2
    - otherwise, unless the charge is due anyway: reauthorize for the hold amount, store the new authorization id and a new 3-day honor window.
 5. `close_at` reached: close it (scheduled).
 
-Then it refreshes payouts that PayPal is still processing. Accepted calls that bring a tab to its threshold also trigger a close immediately, without waiting for the next run.
+Then it refreshes payouts that PayPal is still processing, retries invoice records, and runs the hooks other modules register with `onSettlementTick`: the PayPal dispute sync ([below](#paypal-disputes-and-the-ai-jury)). Accepted calls that bring a tab to its threshold also trigger a close immediately, without waiting for the next run.
 
 In sandbox mode the scheduler remembers the real time of each authorization and does not ask PayPal to reauthorize until 3 real days have passed, because PayPal refuses a reauthorization inside the honor window and the demo clock may be days ahead. A failed reauthorization is retried at most hourly. Either way the tab keeps its original authorization and is charged on schedule.
 
 **Closing** (`src/settlement/close.ts`) takes a per-tab lock, sets `closing`, waits for calls in flight (up to the longest seller timeout plus 1 s), voids whatever is still pending, and records a pending settlement with the floored charge and the sub-cent carry. Outside any transaction it captures once with `final_capture` (or voids the hold when the charge is $0) and voids any remainder PayPal still shows. A final transaction writes the per-seller lines with the pro-rata fee split, credits seller balances, settles the tab and parks the carry for the company's next tab. On a PayPal failure the tab becomes `failed` with its vouchers unsettled, and closing again retries with the same `PayPal-Request-Id`. The exact algorithm and a worked example are in [BINDING.md, section 6](BINDING.md#6-redemption).
 
-**Payouts** (`src/settlement/payouts.ts`) run on `POST /api/payouts/run`, the Sellers page's "Run payouts" button. Sellers owed at least the threshold ($10 by default; the demo UI offers $1 and $0.10) are debited before PayPal is called, paid in one Payouts batch whose `sender_batch_id` is the payout id, and given their money back for any item PayPal fails. There is no automatic weekly job yet.
+**Invoice records** (`src/settlement/invoices.ts`) are on with `PAYPAL_INVOICE_RECORDS=1`. After a charge above $0 the gateway records it in PayPal Invoicing v2 in the background: invoice number `FIAT-<settlement id>` (PayPal's 25-character limit), reference the tab, invoicer "402 Fiatality", recipient the payer of the hold when the order reports their email, and one line, "Agent API usage", whose description lists each seller's calls and gross and the capture id. The draft is created with `PayPal-Request-Id: invoice-<settlement id>`, sent with `send_to_recipient: false` (a payer-view link rather than an email, since the charge is already paid), and the payment is recorded against it with a note naming the capture. A draft left by an earlier attempt is found by its number and finished. The record never fails or delays the settlement: a failure is logged, and after each scheduler run up to 5 completed charges without a paid invoice are tried again, each at most every 5 real minutes. Charges settled before the setting was turned on are picked up the same way, newest first. The statement shows the invoice number, its status and PayPal's link.
+
+**Payouts** (`src/settlement/payouts.ts`) run on `POST /api/payouts/run`, the Sellers page's "Run payouts" button. A seller is paid its available balance minus what open disputes hold ([below](#paypal-disputes-and-the-ai-jury)), when that is at least the threshold ($10 by default; the demo UI offers $1 and $0.10). Sellers are debited before PayPal is called, paid in one Payouts batch whose `sender_batch_id` is the payout id, and given their money back for any item PayPal fails. There is no automatic weekly job yet.
 
 **Purchases** (`src/settlement/purchases.ts`) are separate from the tab. The agent files a proposal with `POST /api/purchases` (title, price, merchant, product link, image, research cost, reasoning). "Approve purchase with PayPal" calls `POST /api/purchases/{id}/checkout`, which creates an Orders v2 `CAPTURE` order with one item and user action `PAY_NOW`. After approval, `/paypal/return?kind=purchase` captures it and the purchase becomes `captured`.
 
-**Every PayPal call that moves money** sends a `PayPal-Request-Id` derived from our own ids (`hold-<tab>`, `authorize-<tab>`, `reauth-<tab>`, `capture-<settlement>`, `void-rest-<settlement>`, `checkout-<purchase>`, the payout id), so retries are idempotent. Failures become a typed `PaypalError` (HTTP 502 `paypal_error`) carrying PayPal's error name, `debug_id` and issues.
+**Every PayPal call that moves money through Orders, Payments or Payouts** sends a `PayPal-Request-Id` derived from our own ids (`hold-<tab>`, `authorize-<tab>`, `reauth-<tab>`, `capture-<settlement>`, `void-rest-<settlement>`, `void-<settlement>` for a $0 close, `checkout-<purchase>`, the payout id), so retries are idempotent; so does the invoice draft (`invoice-<settlement>`), and the client's capture refund takes one from its caller. Dispute actions send none: each is sent once per request, recorded on the dispute with PayPal's answer, and never retried automatically. Failures become a typed `PaypalError` (HTTP 502 `paypal_error`) carrying PayPal's error name, `debug_id` and issues.
 
-**PayPal clients** (`src/paypal/`): the sandbox client uses the Server SDK's `OrdersController` and `PaymentsController` with `Prefer: return=representation` (so captures report `seller_receivable_breakdown.paypal_fee`), and plain REST for Payouts. One OAuth token cache serves both, and the client secret lives only inside that cache's closure. The mock client implements the same interface offline and keeps its orders, authorizations, captures and batches in the `kv` table so they survive restarts. It enforces PayPal's rules: approval before authorization, one reauthorization after the honor window, expiry at 29 days, captures capped at 115% of the hold or +$75 (whichever is less), duplicate invoice ids rejected, and repeated request ids answered with the first result.
+**PayPal clients** (`src/paypal/`): the sandbox client uses the Server SDK's `OrdersController` and `PaymentsController` with `Prefer: return=representation` (so captures report `seller_receivable_breakdown.paypal_fee`), including the capture refund, and plain REST for Payouts v1, Disputes v1 and Invoicing v2, which are not in the SDK. One OAuth token cache serves both, and the client secret lives only inside that cache's closure. Dispute evidence goes as `multipart/form-data` with one `input` part of JSON (the shape of PayPal's documented `curl -F`); offers, escalation and adjudication go as JSON; messages and accepting a claim are retried in the other encoding once, only when PayPal rejects the encoding itself. Dispute responses are read tolerantly: the disputed capture ids, the buyer's latest message, the seller's deadline, the outcome, the money given back to the buyer, and the actions PayPal allows now (from its HATEOAS links).
+
+The mock client implements the same interface offline and keeps its orders, authorizations, captures, batches, disputes and invoices in the `kv` table so they survive restarts. It enforces PayPal's rules: approval before authorization, one reauthorization after the honor window, expiry at 29 days, captures capped at 115% of the hold or +$75 (whichever is less), refunds capped at what is left of a capture, duplicate invoice ids rejected, and repeated request ids answered with the first result. Its disputes follow PayPal's lifecycle on the demo clock (next section), and its invoices are `MOCK-INV-...`, marked as paid, with no link.
+
+## PayPal disputes and the AI jury
+
+The company can dispute its one tab charge on PayPal like any other payment. `src/disputes/` brings those disputes into the ledger, holds the sellers' share while one is open, has the AI jury draft a response for a human to send, and applies PayPal's outcome to seller balances. The service is created once per context (`disputesOf(ctx)`), so the routes, the scheduler hook and shutdown share one jury runner.
+
+```mermaid
+flowchart TD
+    opened["The buyer opens a dispute on the tab charge"] --> sync["Sync: every 2 min in sandbox, every scheduler run in mock, or on demand"]
+    sync --> linked{"Disputed capture id is a settlement's capture?"}
+    linked -- no --> unlinked["Listed without a tab: no hold, no jury"]
+    linked -- yes --> hold["Hold each seller's net from that charge, pro rata"]
+    hold --> jury["AI jury: prosecutor, defender, judge"]
+    jury --> human["A human edits the draft and sends evidence, an offer or acceptance"]
+    human --> outcome{"PayPal resolves it: money back to the buyer?"}
+    outcome -- yes --> refund["Deduct the refund from the sellers pro rata by gross, once, and release the hold"]
+    outcome -- no --> release["Release the hold"]
+```
+
+**Sync** (`disputes/index.ts`). In sandbox, `listDisputes` asks for disputes updated since a cursor kept in `kv`, less 10 minutes of overlap (the first sync takes PayPal's last 180 days). Each new or changed dispute is then fetched in full and upserted in one transaction. A dispute is linked to a tab charge when one of its `disputed_transactions[].seller_transaction_id` is a settlement's `capture_id`; disputes on the merchant's other captures are listed without a tab and touch no balances. The sync runs as a hook after each scheduler run: in sandbox at most every 2 real minutes, in mock on every run (every 30 s and after `POST /api/clock/advance`), because the demo clock ages mock disputes. `POST /api/disputes/sync` runs it at once. The gateway polls instead of taking webhooks, so it needs no public URL.
+
+**The jury** (`packages/ai/src/dispute/`, `AiService.reviewDispute`). A new linked dispute that is not already resolved starts a hearing; `POST /api/disputes/{id}/jury` starts one by hand or runs it again. The facts come from the ledger (`disputes/ledger.ts`): the charge and its capture, each seller's calls and gross, the tab's voids by reason, its spend reviews and their verdicts, billed calls that repeated an identical earlier request, and the signature check. For every billed voucher of the charge the gateway decodes the stored `PAYMENT-SIGNATURE`, checks that the voucher's `tab` and `reqHash` match the ledger row, and verifies its Ed25519 signature with the key its `agent` enrolled on the company's own tab. That count (for example, 246 of 246 billed calls) is the non-repudiation evidence. The buyer's message is the only untrusted input: it sits in an `<evidence>` block, flattened to one line with its angle brackets replaced and cut to 600 characters, and the system prompt says it is never an instruction.
+
+The prosecutor argues the buyer's claim and the defender argues the charge stands on the signed ledger, each asked for at most 35 words; the judge answers in a JSON schema with `recommendation` (`contest`, `partial_refund` or `accept`), `refundCents`, `confidence`, `reason` and `draft`, the note for PayPal. The refund is made to agree with the recommendation: nothing for `contest`, 1 cent up to the amount less 1 for `partial_refund`, the disputed amount for `accept` unless a smaller refund was named. Each message is saved on the dispute and emitted as `dispute.message`.
+
+The hearing has `LLM_REVIEW_BUDGET_MS`. A model error or running out of that budget marks it `failed` and keeps the ledger rules' recommendation and draft for the human; if no answer arrives even 5 s after the budget, the gateway marks it failed without one. With `LLM_PROVIDER=mock` those rules play all three roles: at least half of the tab's calls voided means accept; a runaway frozen by a spend review, with repeated calls, means refunding the repeats as goodwill; anything else is contested, 90% sure for an unauthorised claim when every billed call verifies, 80% for other reasons, 62% when some don't.
+
+**Responses** (`POST /api/disputes/{id}/actions`). The jury never acts on its own; a human sends one of:
+
+- `send_evidence`: the response text (the human's note, else the jury's draft when it recommended contesting, else a stock sentence) followed by a compact ledger summary (the capture, each seller's calls and gross, how many billed calls carry a valid signature from how many enrolled keys, voids, spend reviews), cut to PayPal's 2,000 characters. It goes as `provide-evidence` with evidence type `OTHER` when PayPal takes evidence, otherwise as `send-message` on an inquiry.
+- `make_offer`: a refund offer (`offer_type` `REFUND`) of `amountCents`, or the jury's refund. PayPal takes offers only on inquiries.
+- `accept_claim`: refund the disputed amount, or `amountCents` as a partial refund.
+
+The amount must be between 1 cent and the disputed amount, a resolved dispute answers `409 dispute_resolved`, and evidence PayPal won't take now answers `409 evidence_not_accepted`. Each attempt is appended to the dispute's `actions` with PayPal's answer. A PayPal failure also answers 502; after a success the dispute is read back from PayPal.
+
+**Demo-only routes.** `POST /api/disputes/{id}/adjudicate` with `{"outcome": "buyer" | "seller"}` needs `DEMO_MODE=1`: it calls PayPal sandbox's adjudicate action (escalating an inquiry to a claim first when PayPal refuses to settle an inquiry) or the mock's. `POST /api/disputes/mock` exists only with mock PayPal: the buyer opens a dispute on a settled charge, by default for all of it with reason `MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED`. Both pass the admin guard like every `/api` write.
+
+**Money rules** (`disputes/store.ts`, `db/dto.ts`). Holds are computed from the open disputes whenever balances are shown or paid out; refunds are applied inside the upsert's transaction.
+
+- While a linked dispute is unresolved, each seller on that charge has `floor(net × min(amount, charged) ÷ charged)` held. Payouts pay the available balance minus everything held, and `SellerDTO.heldMicros` and `DisputeDTO.heldMicros` report it. A zero or negative net holds nothing, so on a tab of a few cents the hold is $0.
+- When PayPal resolves it with money back to the buyer, the amount comes from PayPal's data: `dispute_outcome.amount_refunded`, else the seller's `DISPUTE_SETTLEMENT` debits in `money_movements`, else `refund_details`; for `RESOLVED_BUYER_FAVOUR` or `ACCEPTED` with no figure, the disputed amount; never more than the charge. Those cents are split across the charge's sellers in proportion to their gross (largest remainder) and debited from their available balances, which can go below zero.
+- `refund_applied_cents` advances in the same transaction that adds each seller's part to `dispute_refunds`, so a refund PayPal reports again is never deducted twice, and a later increase is deducted as the difference.
+- A resolution in the seller's favour releases the hold and deducts nothing.
+- Settlement lines are never rewritten, so the settlement invariant still holds, and for each dispute the sum of `dispute_refunds` equals `refund_applied_cents × 10,000`.
+
+**The mock lifecycle** (`paypal/mock.ts`). A mock dispute opens as an inquiry waiting for the seller, who has 10 days on the demo clock to respond before it resolves in the buyer's favour. Evidence puts it under review, a message waits for the buyer, an offer is accepted by the mock buyer at once, and accepting the claim or adjudicating settles it. A charge can have one open dispute at a time, for at most what is left of it.
+
+**Recovery.** A hearing interrupted by a shutdown or a crash is marked failed (at shutdown, or at the next startup) so a human can run it again.
 
 ## Data model
 
-SQLite through better-sqlite3, one file (`data/p402.sqlite` by default) in WAL mode with foreign keys on. Money columns are integer micro-dollars unless the name ends in `_cents`; times are epoch milliseconds on the gateway clock. Every multi-row write runs in a transaction and every statement is parameterized and cached per connection. The schema (`src/db/schema.sql`) is versioned with `PRAGMA user_version`; a database from another version is refused with instructions to delete it, since `data/` only holds demo data.
+SQLite through better-sqlite3, one file (`data/p402.sqlite` by default) in WAL mode with foreign keys on. Money columns are integer micro-dollars unless the name ends in `_cents`; times are epoch milliseconds on the gateway clock. Every multi-row write runs in a transaction and every statement is parameterized and cached per connection. The schema (`src/db/schema.sql`) is versioned with `PRAGMA user_version` and is at version 2. `openDb` upgrades an older database in place, in one transaction: it runs each migration step above the database's version, then the idempotent `schema.sql`, then sets the version. Version 2 only added tables (`disputes`, `dispute_refunds`, `invoices`), so a v1 database keeps all its data and needs no step code. Only a database from a newer build is refused, with instructions.
 
 | Table | Holds | Notes |
 |---|---|---|
@@ -169,14 +220,17 @@ SQLite through better-sqlite3, one file (`data/p402.sqlite` by default) in WAL m
 | `reviews` | Status, verdict, fault, confidence, reason, voided ids, transcript, model, decided by AI or human | |
 | `settlements` | Billable, charged cents, carry-out, PayPal fee, capture id, the fee per-call payments would have cost, call and void counts | |
 | `settlement_lines` | Per seller: gross, fee share, net, calls | Sum of net plus fee share = charged cents x 10,000. |
-| `seller_balances` | Available and paid-out micro-dollars | Available can go below zero after tiny tabs. |
+| `seller_balances` | Available and paid-out micro-dollars | Available can go below zero after tiny tabs, or after a dispute refund that lands once the seller was paid out. What open disputes hold is computed, not stored. |
 | `payouts`, `payout_items` | Batches and their items, with PayPal batch and item ids and statuses | |
+| `disputes` | PayPal's dispute id; the linked settlement, tab, company and capture; status, reason, stage, amount, outcome; refunded and refund-applied cents; the buyer's latest message; the seller's deadline; the actions PayPal allows now; the jury (JSON); the actions sent (JSON) | Unlinked disputes keep null ids and touch no balances. |
+| `dispute_refunds` | Per (dispute, seller): what the seller gave back | Written in the transaction that advances `refund_applied_cents`. |
+| `invoices` | Per settlement: PayPal's invoice id, number, status, amount, payer-view URL | `UNIQUE (settlement_id)`. |
 | `purchases` | Agent proposals and their PayPal order, approval link, capture id, research cost | |
 | `agent_runs`, `agent_steps` | Each in-process run and every step it reported | |
 | `events_log` | Append-only audit of every event except metrics snapshots | |
-| `kv` | Small state: the demo clock offset, each company's pending carry, the key-vault fingerprint, the real authorization time and reauthorization back-off per tab, an escalated review's suggested voids, and the mock PayPal's records | |
+| `kv` | Small state: the demo clock offset, each company's pending carry, the key-vault fingerprint, the real authorization time and reauthorization back-off per tab, an escalated review's suggested voids, the dispute sync cursor, the last failed invoice attempt per charge, and the mock PayPal's records (disputes and invoices included) | |
 
-A voucher is `pending` only while its call is in flight: it counts toward limits but is never billable, listed or emitted, and any left over from a crash are voided at startup. Reviews interrupted by a restart are escalated to a human and interrupted agent runs are marked failed.
+A voucher is `pending` only while its call is in flight: it counts toward limits but is never billable, listed or emitted, and any left over from a crash are voided at startup. Reviews interrupted by a restart are escalated to a human, interrupted agent runs and dispute hearings are marked failed.
 
 ## Events and the WebSocket
 
@@ -190,9 +244,11 @@ A voucher is `pending` only while its call is in flight: it counts toward limits
 | `review.started`, `review.message`, `review.finished` | The AI spend review, one message per role |
 | `settlement.completed` | A tab settles |
 | `payout.completed` | A payout batch reaches a final state |
-| `seller.updated` | A listing, status, price or balance changes |
+| `seller.updated` | A listing, status, price or balance changes, including a dispute hold or refund |
 | `agent.step`, `agent.finished` | In-process agent runs |
 | `purchase.updated` | A proposal, checkout, capture or cancellation |
+| `dispute.updated` | A dispute arrives or changes: PayPal's status, the jury's state, an action sent |
+| `dispute.message` | The dispute jury, one message per role |
 | `clock.advanced` | The demo clock moved |
 | `metrics` | A summary of calls, billable, voids, fees, payouts, open alarms |
 
@@ -204,11 +260,12 @@ A voucher is `pending` only while its call is in flight: it counts toward limits
 |---|---|---|
 | `/` | Landing: the hero as an `HTTP/1.1 402 Fiatality` response line with an IOU tape, how it works, the fee math, a section for sellers, the stack | Plain React and CSS; figures come from the shared fee functions |
 | `/console` | Buyer console: 1 Company, 2 Budget ("Draft policy", editable policy card), 3 Hold ("Approve hold with PayPal"), 4 Run an agent (modes Gemma 4, Scripted, Runaway), 5 Approve the purchase, 6 Close the tab; a live tab card, the review banner, and the CLI command for running your own agent. `?tab=<id>` selects a tab. | |
-| `/terminal` | Clearing terminal: stat strip, "Ask the ledger", the live IOU grid, settlements and payouts grids, seller pulse sparklines, the AI review panel and alarms, one-click Excel export of all three grids | AG Grid Enterprise with the AI Toolkit |
-| `/sellers` | Seller portal: totals, seller cards with prices, balances and void rates, "List your API", payouts and their history | |
+| `/terminal` | Clearing terminal: stat strip, "Ask the ledger", the live IOU grid, settlements and payouts grids, seller pulse sparklines, the AI review panel and alarms, one-click Excel export of all three grids, and an "open disputes" pill when any are open | AG Grid Enterprise with the AI Toolkit |
+| `/jury` | The AI jury's docket, newest first: rogue-agent reports from spend reviews and PayPal dispute cases. "The record" strip (one mark per case, colored by outcome; it doubles as legend and navigation), filter chips (All, Rogue agents, Disputes, Open; `?show=`), and each case's ruling and debate. A dispute case adds PayPal's facts, what is held from sellers, the jury's recommendation, an editable response with Send evidence, Offer refund and Accept claim behind a confirm step, the log of what was sent, and in demo mode a "Sandbox simulation" box (Rule for buyer, Rule for seller). "Sync with PayPal", and "Simulate a dispute" in mock mode. `/jury#<case id>` opens a case; the console links there when an agent is frozen, as do statements, Sellers and the terminal. Debates stream in live. | |
+| `/sellers` | Seller portal: totals including what is held for disputes, seller cards with prices, balances, holds and void rates, "List your API", payouts and their history | |
 | `/insights` | Spend by seller and voids by reason over a chosen range; fee rate by tab size and per-call vs batched fees; "Explore the ledger" in AG Studio with its AI assistant on Gemma | AG Charts, AG Studio |
 | `/timeline` | Every tab's hold on one schedule against the demo clock, with drag-to-reschedule and a "+1 day" fast-forward in demo mode | Bryntum Scheduler |
-| `/statements/:tabId` | A printable statement | |
+| `/statements/:tabId` | A printable statement: the charge, fees against per-call payments, the per-seller split, PayPal disputes on the charge with the jury's recommendation, and the PayPal references, including the paid invoice when one was recorded | |
 
 Each page is a lazily loaded route, so AG Grid, AG Studio and Bryntum load only with the pages that use them. The data layer lives in `src/lib`:
 
@@ -231,11 +288,12 @@ The design system (`src/styles/tokens.css`, `src/components`) uses CSS variables
 |---|---|---|
 | `PAYPAL_MODE` | `mock` | `mock` or `sandbox` |
 | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | | Sandbox REST app credentials |
+| `PAYPAL_INVOICE_RECORDS` | `0` | `1` records each tab charge as a paid PayPal invoice |
 | `LLM_PROVIDER` | `mock` (also in `.env.example`) | `ollama`, `openai` or `mock` |
 | `LLM_BASE_URL` | `http://localhost:11434` (`https://api.openai.com` for `openai`) | Model server |
 | `LLM_MODEL` | `gemma4:12b` | Model tag |
 | `LLM_API_KEY` | | For OpenAI-compatible servers |
-| `LLM_REVIEW_BUDGET_MS` | `45000` | Time for one spend review before it escalates (5,000 to 600,000) |
+| `LLM_REVIEW_BUDGET_MS` | `45000` | Time for one spend review before it escalates, and for one dispute hearing (5,000 to 600,000) |
 | `CHANNEL3_API_KEY` | | Seeds the real Channel3 API instead of the demo catalog |
 | `SELLER_PAYPAL_EMAIL_CHANNEL3`, `_PRICEWATCH`, `_REVIEWS` | Placeholder addresses | Payout receivers for the demo sellers |
 | `MASTER_KEY` | Generated into `DATA_DIR/master.key` | 32 bytes, hex or base64, for the seller key vault |
@@ -252,13 +310,13 @@ The design system (`src/styles/tokens.css`, `src/components`) uses CSS variables
 
 **The context.** `src/context.ts` defines `AppContext` (`config`, `db`, `bus`, `clock`, `log`, `paypal`, `settlement`, `ai`, `runAgent`, `demoSellers`) and the service contracts. `createContext(config, overrides)` fills in anything not provided with stubs that throw `503 not_wired`, so a half-wired gateway fails loudly. `createTestContext()` gives tests an in-memory database, mock modes and silent logs.
 
-**The composition root.** `src/services.ts` picks the real implementations: `createPaypalClient` (mock or sandbox by `PAYPAL_MODE`), `createAiService` (Ollama, OpenAI-compatible or mock, with the review budget, the demo clock, and a 700 ms pause between mock review messages so the offline debate visibly streams), `createSettlementService`, `runAgent` and `demoSellers`.
+**The composition root.** `src/services.ts` picks the real implementations: `createPaypalClient` (mock or sandbox by `PAYPAL_MODE`), `createAiService` (Ollama, OpenAI-compatible or mock, with the review budget, the demo clock, and a 700 ms pause between mock review and jury messages so the offline debates visibly stream), `createSettlementService`, `runAgent` and `demoSellers`.
 
 **The clock.** `src/clock.ts` gives the gateway's time: real time plus an offset stored in `kv`, which only demo mode can change (`POST /api/clock/advance`, up to 60 days per step). Everything stored or scheduled uses it. Voucher freshness and the sandbox reauthorization check use real time instead.
 
-**Startup** (`src/index.ts`): load the config, build the context, clean up work interrupted by the last shutdown (void pending vouchers, escalate running reviews, fail running agent runs), build the server, seed demo data, start the scheduler, listen, then warm the model. `SIGINT` and `SIGTERM` stop the scheduler, close the server (aborting reviews and agent runs) and the database, with a 10-second limit.
+**Startup** (`src/index.ts`): load the config, build the context, clean up work interrupted by the last shutdown (void pending vouchers, escalate running reviews, fail running agent runs and dispute hearings), build the server, seed demo data, start the scheduler, listen, then warm the model. `SIGINT` and `SIGTERM` stop the scheduler, close the server (aborting reviews, agent runs and dispute hearings) and the database, with a 10-second limit.
 
-**The server** (`src/server.ts`) registers helmet, CORS, the `/api` rate limit, the admin guard, the WebSocket plugin and the route plugins: system, sellers, tabs, ledger, agents, AI, settlement, paywall, events. In production it also serves the built web app with an SPA fallback. All errors leave as `{ "error", "message", "details"? }`: zod errors become `400 invalid_request`, unexpected ones `500 internal_error` with nothing internal in the body.
+**The server** (`src/server.ts`) registers helmet, CORS, the `/api` rate limit, the admin guard, the WebSocket plugin and the route plugins: system, sellers, tabs, ledger, agents, AI, settlement, disputes, paywall, events. In production it also serves the built web app with an SPA fallback. All errors leave as `{ "error", "message", "details"? }`: zod errors become `400 invalid_request`, unexpected ones `500 internal_error` with nothing internal in the body.
 
 ## Security design
 
@@ -277,6 +335,9 @@ The design system (`src/styles/tokens.css`, `src/components`) uses CSS variables
 | Request floods | 3,000 requests a minute per client on `/api`; per-tab policy limits on the paywall | `server.ts` |
 | Injected content in HTML pages | Helmet; a strict CSP for the built app; a nonce-based CSP, `no-store` and `no-referrer` on the PayPal return and mock pages, which also escape everything they show | `http/guards.ts`, `settlement/pages.ts` |
 | Prompt injection in the AI review | Untrusted excerpts fenced in `<evidence>`, flattened and stripped of angle brackets; facts computed from the ledger; the ruling validated against the evidence; voids limited to the tab's accepted, unsettled calls; low confidence escalates | `packages/ai/src/review/`, `review/runner.ts` |
+| Prompt injection in the dispute jury | The buyer's message fenced in `<evidence>`, flattened, angle brackets replaced, 600 characters at most; facts and signature counts computed from the ledger; the refund forced to agree with the recommendation; the jury only recommends and a human sends every response | `packages/ai/src/dispute/`, `disputes/` |
+| Paying out money a dispute may take back | While a dispute is open, the sellers' share of it is held from payouts; a refund is deducted once, pro rata by gross, in the transaction that advances `refund_applied_cents`. Money already paid out can't be held: a later refund takes the balance below zero instead | `disputes/store.ts`, `settlement/payouts.ts` |
+| Demo shortcuts on real disputes | Ruling on a dispute needs `DEMO_MODE=1`; simulating one exists only with mock PayPal; both are `/api` writes behind the admin guard | `disputes/index.ts`, `routes/disputes.ts` |
 | Vouchers leaking to third parties | The reference client refuses to sign for or send to any origin but its gateway's, and never sends `/api` headers to the paywall | `packages/agent/src/x402Client.ts` |
 | Secrets in logs | pino redacts authorization, cookies, `x-api-key`, the admin header, `payment-signature` and secret-named fields; the PayPal secret lives only in the token cache's closure; PayPal errors keep `debug_id` but never the outgoing request | `context.ts`, `paypal/oauth.ts`, `paypal/errors.ts` |
 | Bad input | zod on every route and on the AI's own answers; parameterized SQL only | everywhere |
@@ -299,21 +360,21 @@ The design system (`src/styles/tokens.css`, `src/components`) uses CSS variables
 - Opening a new hold cancels the company's unapproved tabs; if one of them is being authorized at that moment, its PayPal authorization can be left open. It should be voided when the status update changes no rows.
 - Seller response schemas may contain slow regular expressions; rejecting `pattern` would close that.
 - Demo mode refuses writes from browser origins other than the app or localhost, so LAN access needs `WEB_BASE_URL` set to that origin. Demo mode itself has no admin token and belongs on localhost.
-- Per-tab locks are in memory, so the design assumes one gateway process per database.
+- Per-tab locks, the dispute sync's lock and running juries are in memory, so the design assumes one gateway process per database.
 
 ## Testing
 
-`npm test` runs 340 Vitest tests in 29 files in a few seconds, entirely offline. `npm run typecheck` runs `tsc` in every package.
+`npm test` runs 387 Vitest tests in 36 files in a few seconds, entirely offline. `npm run typecheck` runs `tsc` in every package.
 
 | Package | Tests | How |
 |---|---:|---|
-| gateway | 198 | `test/helpers.ts` builds an offline gateway (in-memory SQLite, demo mode) with Fastify's `inject`, a fake seller on a local port with scripted behaviors (ok, 500, 404, 402, empty bodies, empty arrays and objects, empty result lists, broken JSON, plain text, slow, oversized, gzip, connection reset, echo) and a test agent that signs vouchers like the real client. Core tests fake the settlement and AI services; settlement tests use the real settlement service on the mock PayPal with a controllable clock; the sandbox client runs through the real Server SDK, with an axios adapter standing in for PayPal's Orders and Payments endpoints and a fake `fetch` for OAuth and Payouts. |
-| ai | 90 | A scriptable fake Ollama and OpenAI-compatible server on 127.0.0.1; policy parsing and fallbacks, structured-output retries, review decisions and prompt fencing, grid plans, the chat proxy. |
-| agent | 24 | A fake paywall: paying on the first request, quotes, resync, repricing, pauses and their limits, frozen tabs, foreign-origin refusal, and all three agent modes, including the planner fallback. |
+| gateway | 228 | `test/helpers.ts` builds an offline gateway (in-memory SQLite, demo mode) with Fastify's `inject`, a fake seller on a local port with scripted behaviors (ok, 500, 404, 402, empty bodies, empty arrays and objects, empty result lists, broken JSON, plain text, slow, oversized, gzip, connection reset, echo) and a test agent that signs vouchers like the real client. Core tests fake the settlement and AI services; settlement and dispute tests use the real services on the mock PayPal with a controllable clock (disputes with the mock jury); the sandbox client runs through the real Server SDK, with an axios adapter standing in for PayPal's Orders and Payments endpoints and a fake `fetch` for OAuth, Payouts, Disputes v1 and Invoicing v2 shaped like PayPal's REST reference. |
+| ai | 101 | A scriptable fake Ollama and OpenAI-compatible server on 127.0.0.1; policy parsing and fallbacks, structured-output retries, review decisions and prompt fencing, the dispute jury (its ledger rules, fencing the buyer's message, a scripted model, the fallback and the budget), grid plans, the chat proxy. |
+| agent | 25 | A fake paywall: paying on the first request, quotes, resync, repricing, pauses and their limits, frozen tabs, foreign-origin refusal, and all three agent modes, including the planner fallback. |
 | sellers | 13 | The demo sellers over HTTP, including seeded flakiness. |
 | shared | 12 | Money math, fees, pro-rata allocation, signing and verification, the request hash, header encoding. |
-| web | 3 | Formatting helpers. |
+| web | 8 | Formatting helpers and the jury docket's rules: ordering, open cases, filters, streamed messages, labels. |
 
-Highlights: the full verification matrix with every 402 reason; two concurrent vouchers with the same sequence number (exactly one gets through); hold, rate and daily limits counting calls in flight; every quality-guard rule through the real proxy; the alarm detectors and every review outcome, including human decisions and timeouts; the scheduler's day-4, day-7, small-tab, expiry and sandbox paths; settlement idempotency, carry, the $0 close, crash recovery and the ledger invariant; payouts, including partial failures; SSRF and vault cases; the admin guard, CORS and origin checks; and an end-to-end run over real HTTP and a WebSocket, with a scripted agent and a runaway agent that ends frozen.
+Highlights: the full verification matrix with every 402 reason; two concurrent vouchers with the same sequence number (exactly one gets through); hold, rate and daily limits counting calls in flight; every quality-guard rule through the real proxy; the alarm detectors and every review outcome, including human decisions and timeouts; the scheduler's day-4, day-7, small-tab, expiry and sandbox paths; settlement idempotency, carry, the $0 close, crash recovery and the ledger invariant; payouts, including partial failures; disputes on a tab charge (sellers' earnings held, the jury contesting an unauthorised claim, a partial refund deducted pro rata by gross exactly once, a frozen runaway's repeats refunded, a dispute the seller ignored closing for the buyer on the demo clock, disputes on other captures left unlinked, the demo-only routes); dispute evidence sent as multipart with an `input` JSON part; invoice records made once, off by default and retried after a failure; a v1 database upgraded in place and a newer one refused; SSRF and vault cases; the admin guard, CORS and origin checks; and an end-to-end run over real HTTP and a WebSocket, with a scripted agent and a runaway agent that ends frozen.
 
-Two scripts cover the real services: `npm run check:paypal` walks the sandbox money path with a human approving the hold, and `npm run check:llm` checks the configured model on every AI feature with timings.
+Two scripts cover the real services: `npm run check:paypal` walks the sandbox money path with a human approving the hold, and also lists disputes and, with `PAYPAL_INVOICE_RECORDS=1`, records an invoice; `npm run check:llm` checks the configured model on every AI feature except the dispute jury, with timings.

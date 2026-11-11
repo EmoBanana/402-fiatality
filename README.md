@@ -6,7 +6,7 @@ HTTP/1.1 402 Fiatality
 
 **Agents pay per call. Finance pays once.**
 
-402 Fiatality brings HTTP 402 micropayments for AI agents to PayPal. A company approves one PayPal hold, its agents sign an IOU for every paid API call, a gateway checks each IOU locally and voids bad responses before anyone is charged, and the whole tab settles as one PayPal charge. Sellers are paid out in PayPal Payouts batches.
+402 Fiatality brings HTTP 402 micropayments for AI agents to PayPal. A company approves one PayPal hold, its agents sign an IOU for every paid API call, a gateway checks each IOU locally and voids bad responses before anyone is charged, and the whole tab settles as one PayPal charge. Sellers are paid out in PayPal Payouts batches. If the company disputes that charge on PayPal, an AI jury drafts the response from the signed IOUs.
 
 Built for the PayPal AI Hackathon on Devpost, 2026. It runs fully offline in mock mode with no keys, or against the PayPal sandbox with Gemma 4 running locally on a Mac.
 
@@ -33,8 +33,9 @@ The figures come from the same fee functions the ledger uses (`packages/shared/s
 1. **One hold per tab.** Finance describes a budget in plain English, Gemma 4 drafts the policy (hold, per-call maximum, daily cap, allowed sellers, rate limit, tab length), and approving it places one PayPal hold: an Orders v2 `AUTHORIZE` order, $50 by default. A company has one open tab at a time, shared by all its agents.
 2. **A signed IOU per paid call.** Agents call seller APIs through the gateway at `/s/<seller>/...` using the x402 v2 headers. Each call carries an Ed25519-signed voucher bound to that exact request, with a per-seller sequence number and running total. The gateway verifies it locally, so paying adds no PayPal round trip.
 3. **Bad responses are voided before anyone pays.** Each seller publishes void rules: server errors, rejected requests, timeouts, empty results, malformed JSON, responses that miss a schema. Spend alarms (repeated requests, error streaks, call velocity, spend spikes) pause the tab and start a three-role AI spend review that resumes, voids the bad calls, freezes a runaway agent, or hands the decision to a human.
-4. **One PayPal charge.** At $50 billable or on day 7, whichever comes first, the gateway captures the billable total, floored to the cent, with `final_capture`, and PayPal releases the rest of the hold. The sub-cent remainder carries into the company's next tab. PayPal's fee is split across the tab's sellers in proportion to what each earned.
-5. **Seller payouts.** Sellers owed at least $10 are paid in one PayPal Payouts batch, minus the $0.25 Payouts fee. The intended cadence is weekly; in this build an operator runs the batch from the Sellers page.
+4. **One PayPal charge.** At $50 billable or on day 7, whichever comes first, the gateway captures the billable total, floored to the cent, with `final_capture`, and PayPal releases the rest of the hold. The sub-cent remainder carries into the company's next tab. PayPal's fee is split across the tab's sellers in proportion to what each earned. With `PAYPAL_INVOICE_RECORDS=1` the charge is also recorded as a paid PayPal invoice, `FIAT-<settlement id>`.
+5. **Disputes.** The company can dispute that one charge on PayPal like any other payment. The gateway syncs disputes from PayPal every 2 minutes (or on **Sync with PayPal**), links each to its tab by capture id, and holds the sellers' share of the disputed amount out of payouts. An AI jury hears the case. The prosecutor argues the buyer's claim; the defender argues the charge stands on the signed IOUs, whose Ed25519 signatures the gateway re-verifies against the keys enrolled on the company's own tab; the judge recommends contesting, a partial refund or accepting, and drafts the response. A human sends it. Money PayPal gives back to the buyer comes off the tab's sellers in proportion to what each earned, exactly once.
+6. **Seller payouts.** Sellers owed at least $10, after anything an open dispute holds, are paid in one PayPal Payouts batch, minus the $0.25 Payouts fee. The intended cadence is weekly; in this build an operator runs the batch from the Sellers page.
 
 The hold follows PayPal's authorization rules: honored for 3 days, reauthorized once on day 4 (which starts a new 3-day honor window), charged by day 7. A tab under $10 on day 4 skips the early renewal, reauthorizes on day 25 and is charged by day 28, inside the authorization's 29 days.
 
@@ -51,7 +52,7 @@ The wire protocol is specified in [docs/BINDING.md](docs/BINDING.md) (the x402 `
 | Cloudflare Monetization Gateway | Stablecoins |
 | **402 Fiatality** | **A PayPal hold** |
 
-That means no wallet and no stablecoin for buyers or sellers, about 440 million existing PayPal accounts, bad responses voided before anything is captured, and a single charge on the company's PayPal account that PayPal's usual dispute process covers.
+That means no wallet and no stablecoin for buyers or sellers, about 440 million existing PayPal accounts, bad responses voided before anything is captured, and a single charge on the company's PayPal account that PayPal's usual dispute process covers, with the signed IOUs as evidence.
 
 ## Architecture
 
@@ -64,7 +65,7 @@ flowchart LR
 
   subgraph fiatality["402 Fiatality"]
     web["Web app :5173<br/>React, AG Grid, AG Studio, Bryntum"]
-    gateway["Gateway :4020<br/>paywall, ledger, alarms, settlement"]
+    gateway["Gateway :4020<br/>paywall, ledger, alarms, settlement, disputes"]
     db[("SQLite ledger")]
   end
 
@@ -73,7 +74,7 @@ flowchart LR
     demo["PriceWatch and ReviewPulse<br/>demo sellers :4030"]
   end
 
-  paypal["PayPal<br/>Orders v2, Payments v2, Payouts"]
+  paypal["PayPal<br/>Orders v2, Payments v2, Payouts,<br/>Disputes v1, Invoicing v2"]
   gemma["Gemma 4<br/>Ollama :11434"]
 
   finance --> web
@@ -82,14 +83,14 @@ flowchart LR
   gateway -->|paid call with the seller key| channel3
   gateway -->|paid call with the seller key| demo
   gateway --- db
-  gateway -->|hold, one capture, payouts| paypal
-  gateway -->|policy, spend review, grid queries| gemma
-  finance -.->|approves the hold and purchases| paypal
+  gateway -->|hold, one capture, payouts, invoices, disputes| paypal
+  gateway -->|policy, spend review, dispute jury, grid queries| gemma
+  finance -.->|approves the hold and purchases, may dispute the charge| paypal
 ```
 
-- **Gateway** (Fastify, Node): the x402 paywall, the voucher ledger in SQLite, policy limits, spend alarms and the AI review runner, PayPal holds, captures and payouts, the REST API and a WebSocket event stream.
+- **Gateway** (Fastify, Node): the x402 paywall, the voucher ledger in SQLite, policy limits, spend alarms and the AI review runner, PayPal holds, captures, payouts and invoice records, the dispute sync and the AI jury, the REST API and a WebSocket event stream.
 - **Agents** pay through the paywall like any external client, whether they run inside the gateway (started from the console) or from a terminal with `npm run agent`.
-- **Web app** (React 19, Vite): the buyer console, the AG Grid clearing terminal, the seller portal, AG Charts and AG Studio insights, and a Bryntum timeline of every hold.
+- **Web app** (React 19, Vite): the buyer console, the AG Grid clearing terminal, the AI jury's docket, the seller portal, AG Charts and AG Studio insights, and a Bryntum timeline of every hold.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the request flow, the tab lifecycle, the data model and the security design.
 
@@ -102,6 +103,8 @@ The console after a scripted agent run in mock mode: every paid call with its pr
 A runaway agent repeated the same paid search; the loop alarm paused the tab and the spend review froze the agent (mock mode, where rules stand in for Gemma):
 
 ![The AI spend review: prosecutor, defender and judge, ending with the agent frozen](docs/images/ai-review.png)
+
+Every spend review and every PayPal dispute becomes a case on the **Jury** page (`/jury`): what called the jury, the full debate, the ruling and, for a dispute, the response the jury drafted, ready to edit and send.
 
 The clearing terminal on AG Grid Enterprise, with every IOU as it clears, "Ask the ledger", seller sparklines and the live review debate:
 
@@ -162,7 +165,7 @@ LLM_BASE_URL=http://localhost:11434
 LLM_MODEL=gemma4:e4b-it-qat     # or gemma4:12b
 ```
 
-Run `npm run check:llm` to check the model end to end. On a slow or memory-starved Mac, raise `LLM_REVIEW_BUDGET_MS` (default 45000), the time one spend review may take before it escalates to a human. Any OpenAI-compatible server also works with `LLM_PROVIDER=openai`, `LLM_BASE_URL` and `LLM_API_KEY`.
+Run `npm run check:llm` to check the model end to end. On a slow or memory-starved Mac, raise `LLM_REVIEW_BUDGET_MS` (default 45000), the time one spend review may take before it escalates to a human; a dispute hearing gets the same budget. Any OpenAI-compatible server also works with `LLM_PROVIDER=openai`, `LLM_BASE_URL` and `LLM_API_KEY`.
 
 ## Mock vs sandbox
 
@@ -174,12 +177,15 @@ Run `npm run check:llm` to check the model end to end. On a slow or memory-starv
 | Capture fee | Published US rate, 3.49% + $0.49 | `paypal_fee` from PayPal's `seller_receivable_breakdown` |
 | Payouts | Succeed at once, $0.25 fee per item | A real Payouts batch, polled until final |
 | Demo clock fast-forward | Simulates every step | The planned reauthorization is skipped while PayPal's real 3-day honor window is open; the charge uses the original authorization |
+| Disputes | **Simulate a dispute** on the Jury page opens one on the newest undisputed charge: an inquiry with 10 days on the demo clock to respond before the buyer wins. Evidence puts it under review; the mock buyer takes any offer at once | Real Disputes v1: the buyer opens one in PayPal's sandbox Resolution Center; the gateway syncs every 2 minutes, or on **Sync with PayPal** |
+| Ruling on a dispute (demo mode) | **Rule for buyer** or **Rule for seller** settles it at once | PayPal's sandbox-only adjudicate action; an inquiry PayPal won't settle is escalated to a claim first |
+| Invoice records (`PAYPAL_INVOICE_RECORDS=1`) | `MOCK-INV-...`, marked as paid, no PayPal link | A real PayPal invoice: drafted, shared as a payer-view link, recorded as paid |
 
-`LLM_PROVIDER=mock` swaps every AI feature for deterministic rules (policy parser, built-in shopping planner, rule-based spend review, rule-based grid queries), so tests and judges never need a model. With `CHANNEL3_API_KEY` set, the `channel3` seller points at the real Channel3 API instead of the demo catalog.
+`LLM_PROVIDER=mock` swaps every AI feature for deterministic rules (policy parser, built-in shopping planner, rule-based spend review, rule-based dispute jury, rule-based grid queries), so tests and judges never need a model. With `CHANNEL3_API_KEY` set, the `channel3` seller points at the real Channel3 API instead of the demo catalog.
 
 ### Sandbox setup
 
-1. At developer.paypal.com, open Apps & Credentials, create a sandbox REST app and put its credentials in `.env`:
+1. At developer.paypal.com, open Apps & Credentials and create a sandbox REST app on a **US** sandbox business account with a USD balance. Put its credentials in `.env`:
 
    ```bash
    PAYPAL_MODE=sandbox
@@ -187,13 +193,24 @@ Run `npm run check:llm` to check the model end to end. On a slow or memory-starv
    PAYPAL_CLIENT_SECRET=...
    ```
 
-2. Enable **Payouts** for that app (your app → Features). Without it holds and captures work but payouts are refused.
-3. Under Testing Tools → Sandbox Accounts, note the **personal** (buyer) account. You approve every hold and purchase with it.
-4. Optional: set `SELLER_PAYPAL_EMAIL_CHANNEL3`, `SELLER_PAYPAL_EMAIL_PRICEWATCH` and `SELLER_PAYPAL_EMAIL_REVIEWS` to sandbox personal account emails to see payouts land. Left blank, the demo sellers get placeholder addresses (`<seller>@sellers.402fiatality.example`) that PayPal marks unclaimed.
-5. Run `npm run check:paypal`. It creates a $5.00 hold and prints the approval link, then polls for up to 30 minutes while you approve it with the sandbox personal account. It then authorizes, captures $1.23 with `final_capture`, checks that the rest of the hold was released, sends a $0.50 payout to `SELLER_PAYPAL_EMAIL_CHANNEL3` (skipped when unset), and prints a pass/fail table with PayPal `debug_id`s. It also reports whether the app's token has the Payouts scope and whether partial capture is enabled on the account. It uses the sandbox credentials whatever `PAYPAL_MODE` says.
-6. Run `npm run check:llm` if you use Gemma, then `npm run dev`.
+   The default sandbox business account takes your developer account's country, which may not be the US. One that holds another currency fails USD payouts with `INSUFFICIENT_FUNDS`, and its capture fees follow that country's pricing. Make the buyer and seller sandbox accounts US accounts too; some non-US sandbox accounts can't hold test cards.
+
+2. Enable **Payouts** for that app (your app → Features). Without it holds and captures work but payouts are refused. Sandbox tokens name the Payouts scope `https://uri.paypal.com/payments/payouts`, which `npm run check:paypal` looks for.
+3. Under Testing Tools → Sandbox Accounts, note the **personal** (buyer) account. You approve every hold and purchase with it, and open disputes with it.
+4. Optional: set `SELLER_PAYPAL_EMAIL_CHANNEL3`, `SELLER_PAYPAL_EMAIL_PRICEWATCH` and `SELLER_PAYPAL_EMAIL_REVIEWS` to sandbox account emails to see payouts land. Left blank, the demo sellers get placeholder addresses (`<seller>@sellers.402fiatality.example`) that PayPal marks unclaimed.
+5. Optional: set `PAYPAL_INVOICE_RECORDS=1` to record each tab charge as a paid PayPal invoice (Invoicing v2). Disputes need no setting.
+6. Run `npm run check:paypal`. After the token check it lists the app's disputes (read-only) to show the Disputes API answers. It then creates a $5.00 hold and prints the approval link, and polls for up to 30 minutes while you approve it with the sandbox personal account. It authorizes, captures $1.23 with `final_capture`, checks that the rest of the hold was released, records that capture as a paid invoice when `PAYPAL_INVOICE_RECORDS=1`, sends a $0.50 payout to `SELLER_PAYPAL_EMAIL_CHANNEL3` (skipped when unset), and prints a pass/fail table with PayPal `debug_id`s. It also reports whether the app's token has the Payouts scope and whether partial capture is enabled on the account. It uses the sandbox credentials whatever `PAYPAL_MODE` says.
+7. Run `npm run check:llm` if you use Gemma, then `npm run dev`.
 
 Tip: point sandbox runs at their own database, for example `DATA_DIR=data/sandbox`, so tabs held on the mock never reach the real API.
+
+### Verified on the sandbox
+
+On November 10 and 11, 2026, with a REST app on a US sandbox business account:
+
+- `npm run check:paypal` passed every step: the $5.00 hold approved and authorized, a $1.23 partial capture with `final_capture` (partial capture is enabled), PayPal's fee of $0.53 (exactly the published 3.49% + $0.49 the ledger models), the rest of the hold released, and a $0.50 payout batch SUCCESS with its item SUCCESS and a $0.25 fee.
+- Listing disputes works, and so do invoice records: created, marked as paid, with a payer-view link.
+- Not yet exercised live: dispute responses (see [Known limitations](#known-limitations)).
 
 ## Sponsors and technology
 
@@ -203,12 +220,15 @@ Only what the code uses:
 |---|---|---|
 | **PayPal Server SDK** (`@paypal/paypal-server-sdk` 2.5) | `packages/gateway/src/paypal/sandbox.ts` | Orders v2: create the `AUTHORIZE` hold order and the `CAPTURE` purchase order, get, authorize, capture. Payments v2: get, reauthorize, capture an authorization with `final_capture`, void. `PayPal-Request-Id` on every call that moves money. |
 | **PayPal Payouts** (REST, OAuth 2.0 client credentials) | same file | `POST /v1/payments/payouts` and `GET /v1/payments/payouts/{id}`. Payouts aren't in the Server SDK, so they are plain REST with the same cached token. |
+| **PayPal Disputes** v1 (REST) | same file, `packages/gateway/src/disputes` | Sync the disputes on tab charges and answer them: provide evidence (multipart, the jury's draft plus a ledger summary), send a message, make a refund offer, accept a claim. Escalate and the sandbox-only adjudicate settle demo disputes. Plain REST with the same token. |
+| **PayPal Invoicing** v2 (REST) | same file, `packages/gateway/src/settlement/invoices.ts` | With `PAYPAL_INVOICE_RECORDS=1`, each tab charge becomes a paid invoice `FIAT-<settlement id>` billed to the hold's payer: drafted, shared as a payer-view link, payment recorded. Best effort, retried by the scheduler. |
+| **PayPal Payments v2 refunds** (Server SDK) | `packages/gateway/src/paypal/sandbox.ts` | Refund a capture in full or in part, with `PayPal-Request-Id`. In the client and tested; no route calls it yet, because dispute refunds go through the Disputes API. |
 | **AG Grid Enterprise** 36, with the **AI Toolkit** | `packages/web/src/features/terminal` | The clearing terminal: live transactions, row grouping with sums, set filters, master/detail review transcripts, sparklines, CSV and Excel export, and "Ask the ledger", which turns a question into grid state through Gemma. |
 | **AG Charts** 14 | `packages/web/src/features/insights/charts` | Spend by seller, voids by reason, fee rate by tab size, per-call vs batched fees. |
 | **AG Studio** 3 | `packages/web/src/features/insights/studio` | "Explore the ledger": a dashboard over calls, tabs and settlements whose AI assistant runs on Gemma through the gateway's chat proxy. |
 | **Bryntum Scheduler** 8 | `packages/web/src/features/timeline` | Every tab's hold on one schedule: honor windows, reauthorization, the charge, payouts. Drag a planned charge to reschedule it. |
 | **Channel3** product API | `packages/sellers/src/demoSellers.ts` | The product data the shopping agent pays for (`POST /v1/search`, `GET /v1/products/:id`) when `CHANNEL3_API_KEY` is set. The offline demo catalog has the same shape. |
-| **Google Gemma 4** via **Ollama** | `packages/ai` | Policy drafting, the shopping agent, the spend review, grid queries and the AG Studio assistant (next section). |
+| **Google Gemma 4** via **Ollama** | `packages/ai` | Policy drafting, the shopping agent, the spend review, the dispute jury, grid queries and the AG Studio assistant (next section). |
 
 Also: Fastify 5, better-sqlite3, zod 4, ajv, pino, React 19, React Router 7, Vite 8, Vitest 5 and TypeScript 5.9 run through tsx. The AG Grid, AG Studio and Bryntum license keys are optional `VITE_*` values in `.env`; without them those components run as watermarked trials.
 
@@ -221,6 +241,7 @@ What Gemma does:
 - **Drafts the policy** from plain English (`POST /api/policy/parse`). The model answers in dollars with nulls for anything not mentioned; a rule-based parse fills the gaps and fixes cents-for-dollars slips; the result is clamped and validated. If the model fails, the rule-based parser answers and the console says so.
 - **Runs the shopping agent** (mode "Gemma 4"). Each step is one JSON action (`search`, `details`, `price_history`, `reviews`, `propose_purchase` or `finish`), and every paid call needs a one-line value-of-information reason ("is this worth $0.005?"). Actions are checked before anything is paid: known product ids, no repeated calls, a research budget of $0.25 by default. After three rejected replies in a row the built-in planner takes that step, and after two failed model calls in a row it takes over the rest of the run, so every run ends in a decision.
 - **Reviews spending** when an alarm pauses a tab: a prosecutor, a defender and a judge, in that order, streamed live. The judge returns `{verdict, fault, confidence, reason, voidVoucherIds}`. Needless spending is agent fault and freezes the agent (sellers keep payment for good data); bad data is seller fault and voids only those calls. Request and response excerpts are fenced as untrusted `<evidence>`, the facts come from the ledger, and a ruling below 0.6 confidence, an inconsistent ruling, an error or running past the review budget (45 s by default) escalates to a human.
+- **Hears PayPal disputes** on a tab's charge with the same three roles: the prosecutor argues the buyer's claim, the defender argues the charge stands on the signed IOU ledger, and the judge returns `{recommendation, refundCents, confidence, reason, draft}`, where the recommendation is `contest`, `partial_refund` or `accept` and the draft is the note for PayPal. The facts come from the ledger, including how many billed calls carry a valid signature from a key enrolled on the company's own tab; the buyer's message is fenced as untrusted `<evidence>`. The jury only recommends: a human edits and sends the response. A model error or running past the review budget marks the hearing failed and keeps the ledger rules' suggestion for the human.
 - **Answers "Ask the ledger"** in the terminal: the AG Grid AI Toolkit sends the question, the grid's structured schema and its current state; Gemma returns a plan limited to the grid's real columns, applied with `setState`.
 - **Powers the AG Studio assistant** on the Insights page through an OpenAI-style chat proxy (`POST /api/ai/chat`) that maps tool calls to Ollama.
 
@@ -235,19 +256,22 @@ Drafting a policy through the gateway took about 10 s. Gemma 4 12B on a busy 16 
 
 \* `gemma4:12b` passed on November 9, 2026, before a later change to the review prompt; `gemma4:e4b-it-qat` passed on the final prompts.
 
+The dispute jury has no step in `npm run check:llm` yet, so there is no Gemma timing for it here. It shares the review budget, and its prompts, streaming, fallback and budget are tested against a scripted model.
+
 ## Demo script
 
-About three minutes. Works in mock mode as is; in sandbox mode the PayPal steps happen on PayPal's sandbox pages.
+About four minutes. Works in mock mode as is; in sandbox mode the PayPal steps happen on PayPal's sandbox pages.
 
 1. **The problem.** On the landing page, "The math": a $0.005 call can't be charged on PayPal, and 1,000 calls paid one by one cost $491.75 in fees against $2.24 for one $50 tab.
 2. **Open a tab.** Click **Open console**. Step 1, Company: Northwind Research is preselected. Step 2, Budget: pick an example or type one ("Up to $50 this week for product research. No call over 2 cents, $10 a day at most, any seller.") and click **Draft policy**. Gemma drafts an editable policy card with a plain-English summary. Step 3, Hold: click **Approve hold with PayPal**. In the popup, sign in with the sandbox personal account and approve (in mock mode, click **Approve hold** on the mock page). The popup closes and the tab card shows the hold, the honor window, the renewal and the charge date.
 3. **Run the agent.** Open **Terminal** in a second window. In step 4, Run an agent, choose mode **Gemma 4** (shown as "Mock LLM" when `LLM_PROVIDER=mock`; **Scripted** needs no model) and click **Run agent**. The feed shows each paid call with its price and the agent's reason; the terminal fills live; flaky ReviewPulse calls void in red with their reason, such as Empty result, Malformed JSON or Seller error (5xx), and cost nothing. Watch "PayPal fee" against "Fee without batching" in the stat strip.
 4. **The proposal.** The run ends in step 5, Approve the purchase, with a card like "research $0.05 → purchase $179.00". Leave it for the finale.
-5. **A runaway agent.** Choose **Runaway** and click **Run agent**. It repeats the same paid search; after 5 identical paid requests within 60 seconds (the default loop rule) the alarm pauses the tab, the review banner streams the prosecutor, the defender and the judge, and the verdict freezes the agent with a reason.
-6. **One charge.** Step 6, Close the tab: click **Close tab and charge $X**, then confirm. The card reads "Settled with one PayPal charge": one capture with `final_capture`, the rest of the hold released, PayPal's fee split across sellers, the sub-cent remainder carried to the next tab. Click **View statement** for the printable statement.
-7. **Seller payouts.** On **Sellers**, click **Run payouts** (in demo mode you can lower the threshold to $1.00 or $0.10). Every seller owed at least the threshold is paid in one PayPal batch, minus $0.25 each. After a tab of only a few cents, sellers can still be below zero because PayPal's fee has a fixed $0.49 part (see [Known limitations](#known-limitations)), and the button says nobody is owed enough yet.
-8. **The finale.** Back on the tab, click **Approve purchase with PayPal**. It is a separate one-time PayPal payment for the product, not part of the tab; the card then shows "Purchased through PayPal" next to the research cost.
-9. **Optional: the calendar.** On **Timeline**, click **+1 day** to fast-forward the demo clock and watch the scheduler renew and charge holds, or drag a planned charge to move it.
+5. **A runaway agent.** Choose **Runaway** and click **Run agent**. It repeats the same paid search; after 5 identical paid requests within 60 seconds (the default loop rule) the alarm pauses the tab, the review banner streams the prosecutor, the defender and the judge, and the verdict freezes the agent with a reason. Click **Read the jury's report** under the verdict: the case opens on the **Jury** page with the alarm that called the jury, the ruling with its fault and confidence, and the whole debate.
+6. **One charge.** Back in the console, step 6, Close the tab: click **Close tab and charge $X**, then confirm. The card reads "Settled with one PayPal charge": one capture with `final_capture`, the rest of the hold released, PayPal's fee split across sellers, the sub-cent remainder carried to the next tab. Click **View statement** for the printable statement; with `PAYPAL_INVOICE_RECORDS=1` it also names the paid PayPal invoice for the charge.
+7. **A dispute.** Open **Jury**. In mock mode, click **Simulate a dispute**: the buyer disputes the charge you just settled. In sandbox mode, sign in to PayPal's sandbox as the personal account, open a dispute on the tab's charge in the Resolution Center, then click **Sync with PayPal**. The case shows the disputed amount, the response deadline and what is held from the sellers while the jury's debate streams in: the prosecutor argues the buyer's claim, the defender cites the re-verified signatures, and the judge recommends a response with a confidence and a draft. (Under the mock rules the jury recommends refunding a frozen runaway's repeated calls as goodwill, and contests a clean tab on its signatures.) Edit the draft if you like, click the highlighted response (**Send evidence**, **Offer refund** or **Accept claim**) and confirm. The mock buyer takes an offer at once; otherwise finish with **Rule for buyer** or **Rule for seller** under "Sandbox simulation". A ruling for the buyer refunds them and takes the refund back from the tab's sellers in proportion to what each earned; a ruling for the seller releases the hold. The statement now lists the dispute with the jury's recommendation.
+8. **Seller payouts.** On **Sellers**, click **Run payouts** (in demo mode you can lower the threshold to $1.00 or $0.10). Every seller owed at least the threshold is paid in one PayPal batch, minus $0.25 each. Earnings held for a dispute that is still open stay out of the batch; Sellers shows them as "Held for disputes". After a tab of only a few cents, sellers can still be below zero because PayPal's fee has a fixed $0.49 part (see [Known limitations](#known-limitations)), and the button says nobody is owed enough yet.
+9. **The finale.** Back on the tab, click **Approve purchase with PayPal**. It is a separate one-time PayPal payment for the product, not part of the tab; the card then shows "Purchased through PayPal" next to the research cost.
+10. **Optional: the calendar.** On **Timeline**, click **+1 day** to fast-forward the demo clock and watch the scheduler renew and charge holds, or drag a planned charge to move it.
 
 Close on the tagline, and name the model: Gemma 4 via Ollama.
 
@@ -258,7 +282,7 @@ Close on the tagline, and name the model: Gemma 4 via Ollama.
 | `npm run dev` | Gateway, demo sellers and web app with file watching |
 | `npm test` | All tests (Vitest), fully offline |
 | `npm run typecheck` | `tsc` in every package |
-| `npm run check:paypal` | Sandbox money-path check: hold, approval, partial capture with `final_capture`, release, payout |
+| `npm run check:paypal` | Sandbox check: the Disputes API (read-only), hold, approval, partial capture with `final_capture`, release, an invoice record with `PAYPAL_INVOICE_RECORDS=1`, payout |
 | `npm run check:llm` | Model check: health, JSON output, policy parse, spend review, grid query, chat proxy, with timings |
 | `npm run agent -- --help` | Run the shopping agent from a terminal against a tab (`--tab`, `--token`, `--task`, `--mode llm\|scripted\|runaway`) |
 | `npm start` | Builds the web app and serves it from the gateway on :4020, with the demo sellers. Set `WEB_BASE_URL=http://localhost:4020` so PayPal's return page links back there. |
@@ -271,11 +295,11 @@ The console shows the exact `npm run agent` command for a tab, with its enroll t
 ```
 packages/
   shared/    Contracts: money math, x402 types, Ed25519 vouchers, request hash, DTOs, events
-  gateway/   Fastify server: paywall, ledger, policy, alarms, AI review runner, PayPal and settlement, REST, /ws
-  ai/        Gemma 4 client (Ollama, OpenAI-compatible, offline mock), policy parser, spend review, grid queries, chat proxy
+  gateway/   Fastify server: paywall, ledger, policy, alarms, AI review runner, PayPal and settlement, invoices, disputes, REST, /ws
+  ai/        Gemma 4 client (Ollama, OpenAI-compatible, offline mock), policy parser, spend review, dispute jury, grid queries, chat proxy
   agent/     x402 client, the shopping agent (llm, scripted, runaway) and its CLI
   sellers/   Demo seller APIs: Channel3-shaped catalog, PriceWatch, ReviewPulse
-  web/       React 19 + Vite dashboard: landing, console, terminal, sellers, insights, timeline, statements
+  web/       React 19 + Vite dashboard: landing, console, terminal, jury, sellers, insights, timeline, statements
 docs/        SPEC.md (blueprint), BINDING.md, ARCHITECTURE.md, PROGRESS.md
 ```
 
@@ -283,16 +307,16 @@ Node packages run TypeScript directly through tsx; only the web app has a build 
 
 ## Testing
 
-`npm test` runs **340 tests in 29 files**, offline: in-memory SQLite, mock PayPal, the mock LLM, and fake sellers and LLM servers on local ports.
+`npm test` runs **387 tests in 36 files**, offline: in-memory SQLite, mock PayPal, the mock LLM, and fake sellers and LLM servers on local ports.
 
 | Package | Tests | Highlights |
 |---|---:|---|
-| gateway | 198 | The paywall verification matrix (every 402 reason), concurrent double-spend, quality guard rules, alarms and reviews, settlement math and ledger invariants, the scheduler (day 4, day 7, small tabs, expiry, sandbox honor window), payouts, mock PayPal rules, the sandbox client against fake PayPal responses, SSRF and admin-guard cases, an end-to-end run over real HTTP |
-| ai | 90 | Policy parsing, structured output and retries, review decisions and prompt fencing, grid queries, the chat proxy |
-| agent | 24 | x402 client: pay on first request, quotes, resync, pauses, foreign-origin refusal; all three agent modes |
+| gateway | 228 | The paywall verification matrix (every 402 reason), concurrent double-spend, quality guard rules, alarms and reviews, settlement math and ledger invariants, the scheduler (day 4, day 7, small tabs, expiry, sandbox honor window), payouts, mock PayPal rules, the sandbox client against fake PayPal responses (Orders, Payments, Payouts, Disputes v1, Invoicing v2, refunds), disputes end to end on the mock (holds, the jury, a partial refund deducted once, the 10-day deadline, unlinked disputes, demo-only routes), invoice records, the v1 to v2 schema upgrade, SSRF and admin-guard cases, an end-to-end run over real HTTP |
+| ai | 101 | Policy parsing, structured output and retries, review decisions and prompt fencing, the dispute jury (ledger rules, fencing the buyer's message, a scripted model, fallback, budget), grid queries, the chat proxy |
+| agent | 25 | x402 client: pay on first request, quotes, resync, pauses, foreign-origin refusal; all three agent modes |
 | sellers | 13 | Demo seller behavior and listings |
 | shared | 12 | Money math, fee functions, vouchers, request hash, header encoding |
-| web | 3 | Formatting helpers |
+| web | 8 | Formatting helpers and the jury docket (ordering, open cases, filters, streamed messages, labels) |
 
 `npm run check:paypal` and `npm run check:llm` cover the real services.
 
@@ -305,19 +329,22 @@ Node packages run TypeScript directly through tsx; only the web app has a build 
 - Seller URLs pass an SSRF guard at registration and again for every connection (every dialed address must be public; localhost only in demo mode). Only allow-listed headers are forwarded, responses are capped at 2 MB, and request paths can't escape the seller's base path.
 - Every input is validated with zod and every SQL statement is parameterized. Helmet, CORS limited to the web origin, and a rate limit on `/api`. With `DEMO_MODE=0`, writes need the `x-p402-admin` header; in demo mode, browser writes are accepted only from the app's own or a localhost origin.
 - The AI review treats request and response text as fenced, sanitized evidence, can only touch the tab's unsettled vouchers, and escalates to a human when unsure.
+- The dispute jury only recommends; a human sends every response to PayPal. The buyer's message is fenced as untrusted evidence and the facts come from the ledger. Ruling on a dispute by hand needs demo mode, and simulating one needs mock PayPal.
 - Logs redact authorization headers, cookies, API keys, the admin token and `PAYMENT-SIGNATURE`. PayPal errors keep `debug_id` but never the outgoing request.
 
 The checklist is in [SPEC §10](docs/SPEC.md#10-security-checklist) and the design, including the fixes from the security review, in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#security-design).
 
 ## Known limitations
 
-- **Tiny tabs can leave sellers a negative net.** PayPal's capture fee has a fixed $0.49 part, split across sellers pro rata, so closing a tab worth a few cents leaves its sellers below zero. Their balances recover from later earnings; payouts need real volume. This keeps the spec's fee math and was a deliberate choice.
+- **Tiny tabs can leave sellers a negative net.** PayPal's capture fee has a fixed $0.49 part, split across sellers pro rata, so closing a tab worth a few cents leaves its sellers below zero. Their balances recover from later earnings; payouts need real volume. This keeps the spec's fee math and was a deliberate choice. A dispute on such a charge holds $0, because a negative net holds nothing, but a refund is still taken from the sellers.
+- **Dispute responses haven't run against the live sandbox yet.** Listing disputes is verified live; sending evidence, offers and accepting a claim are tested against fake PayPal responses and run end to end in mock mode. A live dispute run is planned.
+- **Holds start when a dispute arrives.** Earnings already paid out aren't held, so a refund after a payout leaves the seller's balance below zero until later earnings cover it.
 - **Payouts are run by hand.** `POST /api/payouts/run` (the **Run payouts** button) pays everyone over the threshold; there is no automatic weekly job yet.
 - **The demo clock vs PayPal's honor window.** The demo clock can jump days ahead; PayPal's sandbox can't, and it refuses a reauthorization inside the real 3-day honor window. In sandbox mode the scheduler skips the planned reauthorization while that window is open (the timeline still shows it), and the charge uses the original authorization. **Close tab and charge** captures at once.
-- **Partial capture** of PayPal-wallet authorizations may need enabling on a sandbox merchant account. `npm run check:paypal` detects it.
+- **Partial capture** of PayPal-wallet authorizations may need enabling on a sandbox merchant account; it was enabled on the US sandbox app this build was verified with. `npm run check:paypal` detects it.
 - **Open security items** from the security review: `GET /paypal/cancel` is unauthenticated and its `ref` and `token` are readable from `/api/tabs`, so anyone who can reach the gateway can cancel a pending hold approval; a new hold that cancels a tab while its authorization is in flight can leave a PayPal authorization open; seller response schemas may contain slow regular expressions. Demo mode refuses writes from browser origins other than the app or localhost, so LAN access needs `WEB_BASE_URL` set to that origin.
 - **Demo mode has no admin token.** Keep `DEMO_MODE=1` on localhost; anywhere else set `DEMO_MODE=0` and `ADMIN_TOKEN`.
-- **One gateway process per database.** Per-tab locks are in memory; across processes the voucher UNIQUE index and PayPal-Request-Id idempotency are the only guards.
+- **One gateway process per database.** Per-tab locks, the dispute sync's lock and running juries live in memory; across processes the voucher UNIQUE index and PayPal-Request-Id idempotency are the only guards.
 
 ## License
 

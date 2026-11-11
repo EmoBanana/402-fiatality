@@ -333,10 +333,32 @@ it and marks the purchase captured with the research cost attached ("research $0
 
 ### 6.7 Statement & check script
 `GET /api/tabs/:id/statement` → `StatementDTO` (per-seller lines, voids by reason, fee rate, naive fee,
-PayPal ids). Optional: when `PAYPAL_INVOICE_RECORDS=1`, create a PayPal invoice and record it as paid.
+PayPal ids). Optional, **implemented**: when `PAYPAL_INVOICE_RECORDS=1`, create a PayPal invoice and record it as paid
+(Invoicing v2: `FIAT-<settlementId>` for the hold's payer, shared as a payer-view link, retried by the scheduler;
+`src/settlement/invoices.ts`). The statement includes it (`StatementDTO.invoice`) and the charge's disputes.
 `scripts/check-paypal.ts`: token → create AUTHORIZE order → print approve URL → wait for Enter → authorize →
 partial capture with final_capture → verify remainder → tiny payout to `SELLER_PAYPAL_EMAIL_CHANNEL3` →
 print a pass/fail table with `debug_id`s.
+
+### 6.8 Disputes (built Nov 11)
+PayPal disputes on a tab's one charge: Disputes API v1 over REST (`src/disputes/`, `src/routes/disputes.ts`).
+- **Sync**: every 2 min in sandbox (a hook after the scheduler tick), every tick in mock, or `POST /api/disputes/sync`.
+  Linked to the tab by capture id; disputes on other captures are listed unlinked and touch no balances.
+- **AI jury** (`packages/ai/src/dispute/`, `ai.reviewDispute`): starts on each new linked, unresolved dispute
+  (`POST /api/disputes/:id/jury` re-runs it). Prosecutor (the buyer's claim) → defender (the charge stands on the signed
+  IOU ledger) → judge: `{recommendation: contest|partial_refund|accept, refundCents, confidence, reason, draft}`, streamed
+  as `dispute.message`. The facts re-verify every billed voucher's Ed25519 signature against the agent keys enrolled on
+  the company's own tab (the non-repudiation evidence); the buyer's message is fenced as untrusted evidence. Mock LLM:
+  deterministic ledger rules.
+- **Responses** (a human): `POST /api/disputes/:id/actions` `send_evidence` (the draft + a compact ledger summary,
+  ≤ 2,000 chars) | `make_offer` | `accept_claim`. Demo only: `POST /api/disputes/:id/adjudicate {outcome: buyer|seller}`
+  (sandbox adjudicate, or the mock). Mock PayPal only: `POST /api/disputes/mock` (the buyer opens one).
+- **Money**: while open, the sellers' net from that charge is held pro rata (amount ÷ charged; a negative net holds
+  nothing) and payouts pay available − held. Money back to the buyer is deducted from the sellers pro rata by gross,
+  exactly once (`dispute_refunds`, `refund_applied_cents`). Seller favour releases the hold.
+- **Mock lifecycle**: 10 days (demo clock) to respond, then buyer favour; evidence → under review; an offer is accepted at once.
+- Schema v2 adds `disputes`, `dispute_refunds`, `invoices` (a v1 database is upgraded in place). Events `dispute.updated`,
+  `dispute.message`; `SellerDTO.heldMicros`. Payments v2 capture refunds exist in the client (no route uses them yet).
 
 ---
 
@@ -424,7 +446,7 @@ Each requires `x-api-key: demo-<id>-key` (shows the gateway injecting seller key
 - Radius 10 (cards) / 8 (inputs) / 999 (pills). 8 px spacing grid. Motion 150–200 ms ease-out.
 - Do not use PayPal's logo or brand colors; use the official PayPal approval page for holds. Simple "402"
   monogram + "402 Fiatality" wordmark (emphasize "Fiat": **Fiat**ality). Sponsor names as plain text, no logos.
-- Components (in `src/components`): AppShell (top nav: Console, Terminal, Sellers, Insights, Timeline +
+- Components (in `src/components`): AppShell (top nav: Console, Terminal, Jury, Sellers, Insights, Timeline +
   mode badges "PayPal sandbox|mock" and "Gemma 4 · 12b"), Button, Input, Textarea, Card, Stat, Badge/Pill,
   Table, EmptyState, Toast, Drawer, Money (formats micros with sub-cent precision).
 
@@ -445,6 +467,11 @@ Each requires `x-api-key: demo-<id>-key` (shows the gateway injecting seller key
   that went through a review (transcript), side panel with alarms + live review debate, "Ask the ledger" box
   using the **AI Toolkit** (`AiToolkitModule`, `getStructuredSchema()` + `getState()` → `/api/ai/grid-query`
   → `setState`), settlements grid tab, CSV/Excel export. Theme via `themeQuartz.withParams` matching tokens.
+- **Jury `/jury`** (built Nov 11): the AI jury's docket, newest first: rogue-agent reports from spend reviews and PayPal
+  dispute cases (§6.8). "The record" strip (one mark per case, colored by outcome), filter chips (All, Rogue agents,
+  Disputes, Open), debate transcripts, the jury's recommendation and an editable response (Send evidence / Offer refund /
+  Accept claim), and a sandbox simulation box in demo mode. "Sync with PayPal"; "Simulate a dispute" in mock mode.
+  Linked from the console when an agent is frozen, from statements, Sellers and the terminal.
 - **Sellers `/sellers`**: seller cards (prices, balance, paid out, void rate), "List your API" form
   (base URL, auth header, key, PayPal email, endpoints + prices, void-rule toggles), "Run payouts" button,
   payout history.
