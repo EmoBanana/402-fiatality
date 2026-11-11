@@ -337,7 +337,8 @@ export interface DisputeJuryDTO {
 }
 
 /** sandbox_adjudicate exists only in PayPal's sandbox (and the mock): it settles the dispute for the demo. */
-export type DisputeActionKind = "send_evidence" | "make_offer" | "accept_claim" | "sandbox_adjudicate";
+/** `escalate` and `sandbox_adjudicate` come from the demo-only ruling (PayPal's sandbox rules only on claims). */
+export type DisputeActionKind = "send_evidence" | "make_offer" | "accept_claim" | "escalate" | "sandbox_adjudicate";
 
 export interface DisputeActionDTO {
   kind: DisputeActionKind;
@@ -391,7 +392,7 @@ export interface DisputeSyncResultDTO {
 }
 
 export interface DisputeActionRequestDTO {
-  kind: Exclude<DisputeActionKind, "sandbox_adjudicate">;
+  kind: Exclude<DisputeActionKind, "escalate" | "sandbox_adjudicate">;
   note?: string;
   /** make_offer: the refund offered; accept_claim: a partial refund (omit for the full amount). */
   amountCents?: number;

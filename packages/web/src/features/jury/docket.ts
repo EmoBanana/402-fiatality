@@ -246,6 +246,7 @@ export const ACTION_LABEL: Record<DisputeDTO["actions"][number]["kind"], string>
   send_evidence: "Evidence sent",
   make_offer: "Refund offered",
   accept_claim: "Claim accepted",
+  escalate: "Escalated to a PayPal claim",
   sandbox_adjudicate: "Sandbox ruling",
 };
 

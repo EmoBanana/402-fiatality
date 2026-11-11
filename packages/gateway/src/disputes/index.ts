@@ -100,6 +100,15 @@ const ACTION_NOTES = {
   accept_claim: "Claim accepted: PayPal refunds the buyer.",
 } as const;
 
+/** Why PayPal's sandbox won't rule on a case in this status, and what moves it on. */
+function rulingNotOffered(status: string): string {
+  const base = "PayPal's sandbox rules only on a claim under its review.";
+  if (status === "WAITING_FOR_SELLER_RESPONSE") return `${base} PayPal is waiting for the seller: send evidence first, then rule.`;
+  if (status === "WAITING_FOR_BUYER_RESPONSE") return `${base} PayPal is waiting for the buyer to answer.`;
+  if (status === "UNDER_REVIEW") return `${base} PayPal hasn't offered a ruling on this case yet; try again in a few minutes.`;
+  return `${base} This case is ${status}.`;
+}
+
 interface Running {
   controller: AbortController;
   promise: Promise<void>;
@@ -358,17 +367,24 @@ export function createDisputeService(ctx: AppContext): DisputeService {
       }
       const outcome = request.outcome === "buyer" ? "BUYER_FAVOR" : "SELLER_FAVOR";
       const words = request.outcome === "buyer" ? "the buyer's" : "the seller's";
-      const mode = ctx.paypal.mode === "mock" ? "mock PayPal" : "PayPal sandbox";
-      await attempt(disputeId, { kind: "sandbox_adjudicate", amountCents: null, note: `Settled in ${words} favour (${mode}).` }, async () => {
-        try {
-          await ctx.paypal.adjudicateDispute(disputeId, outcome);
-        } catch (err) {
-          // PayPal settles only disputes under review: escalate an inquiry to a claim first, then settle it.
-          if (!(err instanceof PaypalError && err.httpStatus === 422 && row.stage === "INQUIRY")) throw err;
-          await ctx.paypal.escalateDispute(disputeId, "Escalated to settle the 402 Fiatality sandbox demo.");
-          await ctx.paypal.adjudicateDispute(disputeId, outcome);
+      if (ctx.paypal.mode !== "mock") {
+        // The sandbox rules only on a case under PayPal's review that offers an adjudicate link. An inquiry gets
+        // there as a claim: escalated, answered by the seller once PayPal asks (a few minutes later), then reviewed.
+        const live = await ctx.paypal.getDispute(disputeId);
+        apply(live);
+        if (!live.actions.includes("adjudicate")) {
+          if (live.stage !== "INQUIRY" || !live.actions.includes("escalate")) throw conflict("ruling_not_offered", rulingNotOffered(live.status));
+          await attempt(disputeId, { kind: "escalate", amountCents: null, note: "Escalated to a PayPal claim so the sandbox can rule on it." }, () =>
+            ctx.paypal.escalateDispute(disputeId, "Escalated to settle the 402 Fiatality sandbox demo."),
+          );
+          await refreshQuietly(disputeId);
+          return dto(disputeId);
         }
-      });
+      }
+      const mode = ctx.paypal.mode === "mock" ? "mock PayPal" : "PayPal sandbox";
+      await attempt(disputeId, { kind: "sandbox_adjudicate", amountCents: null, note: `Settled in ${words} favour (${mode}).` }, () =>
+        ctx.paypal.adjudicateDispute(disputeId, outcome),
+      );
       await refreshQuietly(disputeId);
       return dto(disputeId);
     },

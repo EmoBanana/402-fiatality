@@ -9,7 +9,7 @@ import type { FastifyInstance } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 import { DAY_MS } from "../clock";
 import { testConfig } from "../config";
-import { createTestContext, type AppConfig, type AppContext } from "../context";
+import { createTestContext, type AppConfig, type AppContext, type PaypalAdjudication } from "../context";
 import { stmt } from "../db/db";
 import { sellerHeldMicros } from "../db/dto";
 import { createPaypalClient } from "../paypal";
@@ -227,6 +227,42 @@ describe("disputes on a tab charge", () => {
     await call(h, "POST", "/api/clock/advance", { ms: 11 * DAY_MS });
     expect(disputesOf(h.ctx).get(dispute.id)).toMatchObject({ status: "RESOLVED", outcome: "RESOLVED_BUYER_FAVOUR", refundedCents: 150 });
     expect(balanceOf(h.ctx, "channel3").available).toBe(before - 1_000_000);
+  });
+
+  it("rules in the sandbox only where PayPal offers it, escalating an inquiry first", async () => {
+    const h = await harness();
+    const { settlement } = await settledTab(h);
+    const { body: dispute } = await call<DisputeDTO>(h, "POST", "/api/disputes/mock", { settlementId: settlement.id });
+    await disputesOf(h.ctx).idle();
+    // The mock's states and links, read as the sandbox: a ruling needs a claim under review with an adjudicate link.
+    const real = h.ctx.paypal;
+    const calls: string[] = [];
+    h.ctx.paypal = new Proxy(real, {
+      get: (t, p, r) => {
+        if (p === "mode") return "sandbox";
+        if (p === "escalateDispute") return (id: string, note: string) => (calls.push("escalate"), real.escalateDispute(id, note));
+        if (p === "adjudicateDispute") return (id: string, outcome: PaypalAdjudication) => (calls.push("adjudicate"), real.adjudicateDispute(id, outcome));
+        return Reflect.get(t, p, r);
+      },
+    });
+
+    // An inquiry: escalated to a claim, not ruled on.
+    const escalated = await call<DisputeDTO>(h, "POST", `/api/disputes/${dispute.id}/adjudicate`, { outcome: "seller" });
+    expect(calls).toEqual(["escalate"]);
+    expect(escalated.body).toMatchObject({ status: "UNDER_REVIEW", stage: "CHARGEBACK" });
+    expect(escalated.body.actions.at(-1)).toMatchObject({ kind: "escalate", ok: true });
+
+    // PayPal asks the buyer for more: no ruling offered, nothing recorded.
+    await real.requireDisputeEvidence(dispute.id, "BUYER_EVIDENCE");
+    const waiting = await call<{ error: string; message: string }>(h, "POST", `/api/disputes/${dispute.id}/adjudicate`, { outcome: "seller" });
+    expect(waiting).toMatchObject({ status: 409, body: { error: "ruling_not_offered", message: expect.stringContaining("waiting for the buyer") } });
+    expect(disputesOf(h.ctx).get(dispute.id).actions).toHaveLength(1);
+
+    // Back under review, the claim offers the adjudicate link: ruled.
+    stmt(h.ctx.db, "UPDATE kv SET value = json_set(value, '$.status', 'UNDER_REVIEW') WHERE key LIKE ?").run(`%dispute:${dispute.id}`);
+    const ruled = await call<DisputeDTO>(h, "POST", `/api/disputes/${dispute.id}/adjudicate`, { outcome: "seller" });
+    expect(calls).toEqual(["escalate", "adjudicate"]);
+    expect(ruled.body).toMatchObject({ status: "RESOLVED", outcome: "RESOLVED_SELLER_FAVOUR", heldMicros: 0 });
   });
 
   it("leaves an accepted claim for PayPal to close instead of ruling on it", async () => {
