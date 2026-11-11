@@ -1526,10 +1526,12 @@
   font-size: 15px;
 }
 
-/* "402 Fiatality" in the arcade pixel face, sized on its 8 px grid so the pixels stay crisp. */
+/* "402 Fiatality" in the arcade pixel face: small, letters set tight, a little air after the slip. */
 .ui-wordmark {
+  margin-left: 4px;
   font-family: var(--font-brand);
-  font-size: 12px;
+  font-size: 10px;
+  letter-spacing: -0.08em;
   line-height: 1;
   white-space: nowrap;
 }
