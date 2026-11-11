@@ -1,55 +1,45 @@
 /**
- * The 402 Fiatality lockup: a small segment display reading 4:02 (HTTP 402, read as a clock) followed by the
- * wordmark in segment letters, like the readout of a digital clock. Never PayPal's logo or colors.
- *   <Logo />                     display + wordmark (accessible name "402 Fiatality")
- *   <Logo full />                wordmark spelled out as "402 Fiatality" (print headers, no display)
- *   <Monogram size={20} />       just the 4:02 display
- *   <Wordmark />                 the wordmark in running text
+ * The 402 Fiatality lockup: a receipt slip (many IOU lines, one amber total: the tab's single charge) followed by
+ * the name "402 Fiatality" in an arcade pixel face. Never PayPal's logo or colors.
+ *   <Logo />                     slip + name (accessible name "402 Fiatality")
+ *   <Logo full />                the name alone (print headers, no slip)
+ *   <Monogram size={20} />       just the slip; `size` is its height
+ *   <Wordmark />                 the name in running text
  */
 export const PRODUCT_NAME = "402 Fiatality";
 
-/** "4:02" lit over a faint "8:88", so the unlit segments show the way they do on a real clock. */
+/** The slip: a title bar, three IOU lines and the amber total, above a torn edge. */
 export function Monogram({ size = 28 }: { size?: number }) {
   return (
-    <span className="ui-monogram" aria-hidden="true" style={size === 28 ? undefined : { fontSize: size / 2 }}>
-      <span className="ui-monogram-ghost">8:88</span>
-      <span className="ui-monogram-lit">
-        4<span className="ui-monogram-colon">:</span>02
-      </span>
-    </span>
+    <svg className="ui-monogram" width={(size * 26) / 32} height={size} viewBox="0 0 26 32" aria-hidden="true">
+      <path
+        className="ui-monogram-paper"
+        d="M3 1H23a1 1 0 0 1 1 1V28L21.25 31L18.5 28L15.75 31L13 28L10.25 31L7.5 28L4.75 31L2 28V2a1 1 0 0 1 1-1Z"
+      />
+      <rect className="ui-monogram-title" x="6" y="5" width="9" height="3" rx="0.8" />
+      <rect className="ui-monogram-line" x="6" y="11" width="14" height="1.6" rx="0.8" />
+      <rect className="ui-monogram-line" x="6" y="14.5" width="11" height="1.6" rx="0.8" />
+      <rect className="ui-monogram-line" x="6" y="18" width="13" height="1.6" rx="0.8" />
+      <rect className="ui-monogram-total" x="6" y="22.4" width="14" height="2.8" rx="0.8" />
+    </svg>
   );
 }
 
-/**
- * FIATALITY in segment letters (a 12 x 20 cell per letter), drawn as strokes rather than set in a segment font so
- * every letter, the Y included, reads at full height.
- */
-const WORDMARK = "M2.3 1.2L9.7 1.2M1.2 2.4L1.2 8.8M1.2 11.2L1.2 17.6M2.3 10L7.4 10M19.3 1.2L26.7 1.2M19.3 18.8L26.7 18.8M23 2.6L23 8.8M23 11L23 17.4M36.3 1.2L43.7 1.2M35.2 2.4L35.2 8.8M44.8 2.4L44.8 8.8M36.3 10L43.7 10M35.2 11.2L35.2 17.6M44.8 11.2L44.8 17.6M53.3 1.2L60.7 1.2M57 2.6L57 8.8M57 11L57 17.4M70.3 1.2L77.7 1.2M69.2 2.4L69.2 8.8M78.8 2.4L78.8 8.8M70.3 10L77.7 10M69.2 11.2L69.2 17.6M78.8 11.2L78.8 17.6M86.2 2.4L86.2 8.8M86.2 11.2L86.2 17.6M87.3 18.8L94.7 18.8M104.3 1.2L111.7 1.2M104.3 18.8L111.7 18.8M108 2.6L108 8.8M108 11L108 17.4M121.3 1.2L128.7 1.2M125 2.6L125 8.8M125 11L125 17.4M138.2 2.4L141.1 9M145.8 2.4L142.9 9M142 11L142 17.4";
-
 export function Wordmark({ className }: { className?: string }) {
   return (
-    <svg className={["ui-wordmark", className].filter(Boolean).join(" ")} viewBox="0 0 148 20" aria-hidden="true">
-      <path d={WORDMARK} />
-    </svg>
+    <span className={["ui-wordmark", className].filter(Boolean).join(" ")}>
+      <span className="ui-wordmark-code">402</span> Fiatality
+    </span>
   );
 }
 
 export function Logo({ className, full = false }: { className?: string; full?: boolean }) {
   return (
     <span className={["ui-logo", className].filter(Boolean).join(" ")} aria-label={PRODUCT_NAME} role="img">
-      {full ? (
-        <span aria-hidden="true" className="ui-logo-full">
-          <span className="ui-logo-402">402</span>
-          <Wordmark />
-        </span>
-      ) : (
-        <>
-          <Monogram />
-          <span aria-hidden="true">
-            <Wordmark />
-          </span>
-        </>
-      )}
+      {full ? null : <Monogram />}
+      <span aria-hidden="true">
+        <Wordmark />
+      </span>
     </span>
   );
 }

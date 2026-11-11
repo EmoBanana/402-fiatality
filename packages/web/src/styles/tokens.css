@@ -5,9 +5,9 @@
  * token is a plain hex/rgba value, so `getComputedStyle(document.documentElement).getPropertyValue("--accent")`
  * is safe to hand to a JS theme.
  *
- * Direction: a digital clock. Warm paper and ink, one brass accent (#8A6626 light / #AE9070 dark), Hanken Grotesk
- * for every word you read, segment letters only for the brand (the drawn wordmark and the DSEG7 4:02 display, lit
- * amber #F5873F), JetBrains Mono for IOUs and ids. Every accent is at least 20 CIEDE2000 from
+ * Direction: a receipt. Warm paper and ink, one brass accent (#8A6626 light / #AE9070 dark), Hanken Grotesk
+ * for every word you read, an arcade pixel face (Press Start 2P) only for the name "402 Fiatality" beside the
+ * receipt-slip mark (amber total #F5873F), JetBrains Mono for IOUs and ids. Every accent is at least 20 CIEDE2000 from
  * every PayPal brand color (no blue; brass and amber both clear PayPal's #FFC439 button yellow) and the dark
  * accent clears the dark warning amber. Text pairs pass WCAG AA in both themes.
  *
@@ -35,9 +35,11 @@
   --accent-soft: #f5eedd;
   --on-accent: #ffffff;
 
-  /* The 4:02 display (logo): its panel, the faint unlit segments, the lit amber segments */
-  --mark-dial: #17150f;
-  --mark-hands: #f7f5ef;
+  /* The receipt slip (logo): paper, its outline, the title bar, the IOU lines, the amber total */
+  --mark-paper: #fffdf8;
+  --mark-edge: #17150f;
+  --mark-ink: #17150f;
+  --mark-lines: #6e685c;
   --mark-accent: #f5873f;
 
   /* Status */
@@ -67,8 +69,8 @@
   --rule-double: 3px double #3e3a31;
 
   /* Type */
-  /* The 7-segment face, for the brand's 4:02 display only (the wordmark is drawn in components/Logo.tsx). */
-  --font-digits: "DSEG7", var(--font-mono);
+  /* The arcade pixel face, for the name "402 Fiatality" only. */
+  --font-brand: "Press Start 2P", var(--font-mono);
   --font-sans: "Hanken Grotesk Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --text-12: 12px;
@@ -132,9 +134,11 @@
     --accent: #ae9070;
     --accent-soft: #262119;
     --on-accent: #12110d;
-    --mark-dial: #24211b;
-    --mark-hands: #f2ede2;
-    --mark-accent: #f5873f;
+    --mark-paper: #f2ede2;
+    --mark-edge: #f2ede2;
+    --mark-ink: #17150f;
+    --mark-lines: #6e685c;
+    --mark-accent: #e0712c;
     --success: #5bbe6a;
     --success-soft: #11251a;
     --danger: #f97066;
@@ -169,9 +173,11 @@
   --accent: #ae9070;
   --accent-soft: #262119;
   --on-accent: #12110d;
-  --mark-dial: #24211b;
-  --mark-hands: #f2ede2;
-  --mark-accent: #f5873f;
+  --mark-paper: #f2ede2;
+  --mark-edge: #f2ede2;
+  --mark-ink: #17150f;
+  --mark-lines: #6e685c;
+  --mark-accent: #e0712c;
   --success: #5bbe6a;
   --success-soft: #11251a;
   --danger: #f97066;

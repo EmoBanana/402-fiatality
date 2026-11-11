@@ -98,48 +98,30 @@
   text-decoration: none;
 }
 
-/* The 4:02 display (components/Logo.tsx): lit amber segments over faint unlit ones, the colon ticking. */
+/* The receipt slip (components/Logo.tsx): paper, a title bar, IOU lines and the amber total. */
 .ui-monogram {
-  display: inline-grid;
-  place-items: center;
+  display: block;
   flex-shrink: 0;
-  height: 2em;
-  padding: 0 0.5em;
-  border-radius: 6px;
-  background: var(--mark-dial);
-  font-family: var(--font-digits);
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1;
+  overflow: visible;
 }
 
-.ui-monogram > span {
-  grid-area: 1 / 1;
+.ui-monogram-paper {
+  fill: var(--mark-paper);
+  stroke: var(--mark-edge);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
 }
 
-.ui-monogram-ghost {
-  color: var(--mark-hands);
-  opacity: 0.1;
+.ui-monogram-title {
+  fill: var(--mark-ink);
 }
 
-.ui-monogram-lit {
-  color: var(--mark-accent);
+.ui-monogram-line {
+  fill: var(--mark-lines);
 }
 
-.ui-monogram-colon {
-  animation: ui-colon-tick 2s steps(1, end) infinite;
-}
-
-@keyframes ui-colon-tick {
-  50% {
-    opacity: 0.15;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ui-monogram-colon {
-    animation: none;
-  }
+.ui-monogram-total {
+  fill: var(--mark-accent);
 }
 
 .ui-nav {
@@ -1465,27 +1447,16 @@
   font-size: 15px;
 }
 
-/* The wordmark in segment letters (components/Logo.tsx), stroked in the text color. */
+/* "402 Fiatality" in the arcade pixel face, sized on its 8 px grid so the pixels stay crisp. */
 .ui-wordmark {
-  display: block;
-  height: 0.93em;
-  width: auto;
-  overflow: visible;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.6;
-  stroke-linecap: butt;
+  font-family: var(--font-brand);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
-.ui-logo-full {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.6em;
-}
-
-.ui-logo-402 {
-  font-family: var(--font-digits);
-  font-weight: 700;
+.ui-wordmark-code {
+  color: var(--accent);
 }
 
 /* ------------------------------------------------------------ placeholder (Phase 0 pages) */

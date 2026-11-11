@@ -1,6 +1,6 @@
-// Hanken Grotesk for every word you read; DSEG7 only for the brand's 4:02 display, like a digital clock.
+// Hanken Grotesk for every word you read; Press Start 2P only for the name "402 Fiatality".
 import "@fontsource-variable/hanken-grotesk";
-import "@fontsource/dseg7/classic-700.css";
+import "@fontsource/press-start-2p/latin-400.css";
 import "@fontsource-variable/jetbrains-mono";
 import "./styles/tokens.css";
 import "./styles/base.css";
