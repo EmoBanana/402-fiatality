@@ -9,6 +9,7 @@ import { DISPUTE_ID_PATTERN, disputesOf } from "../disputes";
 
 const disputeId = z.string().regex(DISPUTE_ID_PATTERN, "Invalid dispute id");
 const params = z.object({ id: disputeId });
+const syncBody = z.object({ disputeId: disputeId.optional() });
 const listQuery = z.object({
   tabId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, "Invalid id").optional(),
   limit: z.coerce.number().int().min(1).max(500).default(200),
@@ -52,7 +53,7 @@ export const disputeRoutes: RoutePlugin = async (app, { ctx }) => {
 
   app.get("/api/disputes/:id", async (req): Promise<DisputeDTO> => disputes.get(params.parse(req.params).id));
 
-  app.post("/api/disputes/sync", async (): Promise<DisputeSyncResultDTO> => disputes.sync());
+  app.post("/api/disputes/sync", async (req): Promise<DisputeSyncResultDTO> => disputes.sync(syncBody.parse(req.body ?? {})));
 
   app.post("/api/disputes/mock", async (req, reply) => {
     const dispute = await disputes.openMock(mockBody.parse(req.body ?? {}));

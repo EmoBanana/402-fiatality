@@ -251,6 +251,27 @@ describe("disputes on a tab charge", () => {
     expect((await call<{ checked: number; created: number }>(h, "POST", "/api/disputes/sync")).body).toMatchObject({ created: 0 });
   });
 
+  it("reads a case by its ID while PayPal's dispute search hasn't listed it yet", async () => {
+    const h = await harness();
+    const { tabId, settlement } = await settledTab(h);
+    const { openMockDispute } = await import("../paypal/mock");
+    const opened = openMockDispute(h.ctx, { captureId: settlement.captureId! });
+    // The sandbox's search can miss a new case for a while.
+    const real = h.ctx.paypal;
+    h.ctx.paypal = new Proxy(real, { get: (t, p, r) => (p === "listDisputes" ? async () => [] : Reflect.get(t, p, r)) });
+    expect((await call(h, "POST", "/api/disputes/sync")).body).toEqual({ checked: 0, created: 0, updated: 0 });
+
+    const read = await call(h, "POST", "/api/disputes/sync", { disputeId: opened.id });
+    expect(read.body).toEqual({ checked: 1, created: 1, updated: 0 });
+    const { body: dispute } = await call<DisputeDTO>(h, "GET", `/api/disputes/${opened.id}`);
+    expect(dispute).toMatchObject({ settlementId: settlement.id, tabId, captureId: settlement.captureId });
+    await disputesOf(h.ctx).idle();
+    expect((await call<DisputeDTO>(h, "GET", `/api/disputes/${opened.id}`)).body.jury?.status).toBe("done");
+    expect((await call(h, "POST", "/api/disputes/sync", { disputeId: opened.id })).body).toMatchObject({ checked: 1, created: 0 });
+    expect((await call(h, "POST", "/api/disputes/sync", { disputeId: "nope!" })).status).toBe(400);
+    expect((await call(h, "POST", "/api/disputes/sync", { disputeId: "PP-D-404" })).status).toBeGreaterThanOrEqual(400);
+  });
+
   it("validates input and keeps the demo-only routes demo-only", async () => {
     const h = await harness();
     const { settlement } = await settledTab(h);

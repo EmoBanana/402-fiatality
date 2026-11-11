@@ -778,3 +778,15 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ------------------------------------------------------------ sync (header) */
+
+.jy-sync {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.jy-case-id {
+  width: 200px;
+}

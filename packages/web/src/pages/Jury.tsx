@@ -4,13 +4,14 @@
  * dispute on a tab's one charge, with the jury's recommended response. Filter with ?show=rogue|disputes|open;
  * /jury#<case id> opens a case and scrolls to it. Live from /ws: debates stream in as they happen.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { Button, buttonClassName } from "../components/Button";
 import { Callout } from "../components/Callout";
 import { Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { describeError, ErrorState } from "../components/ErrorState";
+import { Input } from "../components/Field";
 import { PageHeader } from "../components/PageHeader";
 import { Skeleton } from "../components/Skeleton";
 import { useToast } from "../components/Toast";
@@ -115,6 +116,7 @@ export default function Jury() {
   const [openIds, setOpenIds] = useState<ReadonlySet<string>>(() => new Set());
   const [scrollTo, setScrollTo] = useState<string | null>(null);
   const [busy, setBusy] = useState<"sync" | "simulate" | null>(null);
+  const [caseId, setCaseId] = useState("");
   const mock = config?.paypalMode === "mock";
 
   const cases = useMemo(() => buildDocket(docket.reviews ?? [], docket.disputes ?? []), [docket.reviews, docket.disputes]);
@@ -190,18 +192,23 @@ export default function Jury() {
       return next;
     });
 
-  async function sync() {
+  async function sync(event?: FormEvent) {
+    event?.preventDefault();
+    const id = caseId.trim();
     setBusy("sync");
     try {
-      const result = await api.disputes.sync();
+      const result = await api.disputes.sync(id || undefined);
       toast({
         tone: "success",
-        title: "Synced with PayPal",
+        title: id ? `Read ${id} from PayPal` : "Synced with PayPal",
         description:
           result.created || result.updated
             ? `${plural(result.created, "new dispute")}, ${plural(result.updated, "update")}.`
-            : `Checked ${plural(result.checked, "dispute")}; nothing new.`,
+            : id
+              ? "Already up to date."
+              : `Checked ${plural(result.checked, "dispute")}; nothing new.`,
       });
+      if (id) setCaseId("");
       await docket.reload();
     } catch (err) {
       const missing = err instanceof ApiError && err.status === 404;
@@ -313,9 +320,22 @@ export default function Jury() {
                 Simulate a dispute
               </Button>
             ) : null}
-            <Button onClick={sync} loading={busy === "sync"} disabled={Boolean(busy)}>
-              Sync with PayPal
-            </Button>
+            <form className="jy-sync" onSubmit={sync}>
+              <Input
+                className="jy-case-id"
+                aria-label="PayPal case ID (optional)"
+                placeholder="Case ID (optional)"
+                title="A case ID from the buyer's Resolution Center reads that case now; PayPal's search can take a while to list a new one."
+                mono
+                spellCheck={false}
+                autoComplete="off"
+                value={caseId}
+                onChange={(e) => setCaseId(e.target.value)}
+              />
+              <Button type="submit" loading={busy === "sync"} disabled={Boolean(busy)}>
+                {caseId.trim() ? "Read case" : "Sync with PayPal"}
+              </Button>
+            </form>
           </>
         }
       />

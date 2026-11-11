@@ -376,6 +376,14 @@ export interface DisputeDTO {
   updatedAt: number;
 }
 
+/**
+ * POST /api/disputes/sync body. With `disputeId` (the case ID from the buyer's Resolution Center or PayPal's
+ * email), only that case is read: PayPal's dispute search can miss a new sandbox case for a while.
+ */
+export interface DisputeSyncRequestDTO {
+  disputeId?: string;
+}
+
 export interface DisputeSyncResultDTO {
   checked: number;
   created: number;

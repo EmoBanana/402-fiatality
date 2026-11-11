@@ -12,6 +12,7 @@ import {
   type DisputeAdjudicateDTO,
   type DisputeDTO,
   type DisputeJuryDTO,
+  type DisputeSyncRequestDTO,
   type DisputeSyncResultDTO,
   type MockDisputeCreateDTO,
   type ReviewMessageDTO,
@@ -44,8 +45,11 @@ const MAX_MESSAGE_CHARS = 4_000;
 export interface DisputeService {
   list(filter?: { tabId?: string; limit?: number }): DisputeDTO[];
   get(disputeId: string): DisputeDTO;
-  /** Poll PayPal now: disputes updated since the cursor, each fetched in full, linked and upserted. */
-  sync(): Promise<DisputeSyncResultDTO>;
+  /**
+   * Poll PayPal now: disputes updated since the cursor, each fetched in full, linked and upserted. With a
+   * `disputeId`, read just that case (PayPal's search can miss a new sandbox case for a while).
+   */
+  sync(request?: DisputeSyncRequestDTO): Promise<DisputeSyncResultDTO>;
   /** Fetch one dispute from PayPal and upsert it. */
   refresh(disputeId: string): Promise<DisputeDTO>;
   /** (Re)start the jury. Returns the dispute with the jury running. */
@@ -228,8 +232,12 @@ export function createDisputeService(ctx: AppContext): DisputeService {
     list: (filter = {}) => listDisputeDTOs(db, filter),
     get: (disputeId) => dto(disputeId),
 
-    sync() {
+    sync(request = {}) {
       return withLock(db, "disputes:sync", async () => {
+        if (request.disputeId) {
+          const result = apply(await ctx.paypal.getDispute(request.disputeId));
+          return { checked: 1, created: result.created ? 1 : 0, updated: !result.created && result.changed ? 1 : 0 };
+        }
         const mock = ctx.paypal.mode === "mock";
         const cursor = Number(kvGet(db, CURSOR_KEY) ?? 0) || 0;
         const since = !mock && cursor > 0 ? Math.max(cursor - CURSOR_OVERLAP_MS, realNow() - MAX_LOOKBACK_MS) : null;

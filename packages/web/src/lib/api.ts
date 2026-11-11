@@ -217,8 +217,8 @@ export const api = {
   disputes: {
     list: (signal?: AbortSignal) => get<DisputeDTO[]>("/api/disputes", undefined, signal),
     get: (id: string, signal?: AbortSignal) => get<DisputeDTO>(`/api/disputes/${seg(id)}`, undefined, signal),
-    /** Pulls new and changed disputes from PayPal. */
-    sync: () => post<DisputeSyncResultDTO>("/api/disputes/sync"),
+    /** Pulls new and changed disputes from PayPal, or just the case `disputeId` (PayPal's search can lag). */
+    sync: (disputeId?: string) => post<DisputeSyncResultDTO>("/api/disputes/sync", disputeId ? { disputeId } : undefined),
     /** Runs the AI jury again; its messages stream as `dispute.message`. */
     rehear: (id: string) => post<DisputeDTO>(`/api/disputes/${seg(id)}/jury`),
     act: (id: string, body: DisputeActionRequestDTO) => post<DisputeDTO>(`/api/disputes/${seg(id)}/actions`, body),
