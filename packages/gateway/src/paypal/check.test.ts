@@ -84,6 +84,45 @@ describe("runPaypalCheck", () => {
     expect(report.failed).toBe(1);
   });
 
+  it("lists disputes and records the capture as a paid invoice when asked", async () => {
+    const { deps } = setup({ checkDisputes: true, invoiceRecords: true });
+    const report = await runPaypalCheck(deps);
+    expect(report.failed).toBe(0);
+    expect(report.rows.map((r) => r.step)).toEqual([
+      "OAuth token",
+      "Payouts permission",
+      "Disputes API (read-only)",
+      "Create AUTHORIZE order",
+      "Payer approval",
+      "Authorize",
+      "Partial capture (final_capture)",
+      "Fee from seller_receivable_breakdown",
+      "Rest of the hold released",
+      "Invoice record",
+      "Create payout batch",
+      "Payout status",
+    ]);
+    expect(report.rows.find((r) => r.step === "Disputes API (read-only)")).toMatchObject({ result: "PASS", detail: "0 dispute(s) in the last 180 days, 0 open" });
+    expect(report.rows.find((r) => r.step === "Invoice record")).toMatchObject({ result: "PASS" });
+    expect(report.rows.find((r) => r.step === "Invoice record")?.detail).toMatch(/^invoice MOCK-INV-\w+ for \$1\.23: MARKED_AS_PAID$/);
+
+    const off = await runPaypalCheck(setup({ invoiceRecords: false }).deps);
+    expect(off.rows.find((r) => r.step === "Invoice record")).toMatchObject({ result: "SKIP" });
+
+    const { deps: broken, paypal } = setup({ checkDisputes: true });
+    const failing = await runPaypalCheck({
+      ...broken,
+      paypal: {
+        ...paypal,
+        mode: paypal.mode,
+        listDisputes: async () => {
+          throw new PaypalError({ operation: "list disputes", paypalName: "NOT_AUTHORIZED", message: "", debugId: "dbg-d", httpStatus: 403 });
+        },
+      },
+    });
+    expect(failing.rows.find((r) => r.step === "Disputes API (read-only)")).toMatchObject({ result: "FAIL", debugId: "dbg-d" });
+  });
+
   it("stops at the token when the credentials are wrong", async () => {
     const { deps } = setup({
       tokens: {

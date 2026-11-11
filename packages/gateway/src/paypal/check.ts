@@ -2,8 +2,8 @@
  * The sandbox money-path check behind `npm run check:paypal` (SPEC §6.7), kept free of process/terminal
  * concerns so tests can run it offline against the mock:
  *
- *   OAuth token -> AUTHORIZE order -> human approval -> authorize -> partial capture with final_capture
- *   -> the rest of the hold is released -> a tiny payout
+ *   OAuth token -> (Disputes API, read-only) -> AUTHORIZE order -> human approval -> authorize -> partial capture
+ *   with final_capture -> the rest of the hold is released -> (the capture recorded as a paid invoice) -> a tiny payout
  *
  * Every step becomes a row (PASS / FAIL / WARN / SKIP) with PayPal's debug_id when there is one.
  */
@@ -42,6 +42,10 @@ export interface CheckDeps {
   waitForApproval(orderId: string, approveUrl: string): Promise<boolean>;
   /** Called as each row is recorded (live progress). */
   onRow?(row: CheckRow): void;
+  /** List disputes (read-only) to prove the Disputes API answers for this app. */
+  checkDisputes?: boolean;
+  /** PAYPAL_INVOICE_RECORDS: true records the test capture as a paid invoice, false adds a SKIP row, omitted adds nothing. */
+  invoiceRecords?: boolean;
   runId?: string;
   sleep?(ms: number): Promise<void>;
 }
@@ -99,6 +103,17 @@ export async function runPaypalCheck(deps: CheckDeps): Promise<CheckReport> {
   } catch (err) {
     failure("OAuth token", err, "Check that PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET are the sandbox app's credentials");
     return report();
+  }
+
+  // 1b. Disputes API: read-only, needs no approval
+  if (deps.checkDisputes) {
+    try {
+      const disputes = await paypal.listDisputes();
+      const open = disputes.filter((d) => d.status !== "RESOLVED").length;
+      record("Disputes API (read-only)", "PASS", `${disputes.length} dispute(s) in the last 180 days, ${open} open`);
+    } catch (err) {
+      failure("Disputes API (read-only)", err, "The REST app could not list disputes; disputes on tab charges will not sync");
+    }
   }
 
   // 2. Hold: an AUTHORIZE order a human approves, then authorize it
@@ -171,6 +186,31 @@ export async function runPaypalCheck(deps: CheckDeps): Promise<CheckReport> {
         } else {
           failure("Rest of the hold released", err);
         }
+      }
+      if (deps.invoiceRecords === true) {
+        try {
+          const invoice = await paypal.createInvoiceRecord({
+            invoiceNumber: `FIAT-check-${runId}`.slice(0, 25),
+            reference: `check_${runId}`.slice(0, 120),
+            recipientEmail: null,
+            itemName: "Agent API usage",
+            itemDescription: `402 Fiatality sandbox check. Paid by PayPal capture ${capture.id}.`,
+            amountCents: capture.amountCents,
+            note: "402 Fiatality sandbox check: this charge was already paid with PayPal.",
+            memo: `check run ${runId}, capture ${capture.id}`,
+            paymentNote: `Paid by PayPal capture ${capture.id}`,
+            requestId: `check-invoice-${runId}`,
+          });
+          record(
+            "Invoice record",
+            ["PAID", "MARKED_AS_PAID", "PAID_EXTERNAL"].includes(invoice.status) ? "PASS" : "WARN",
+            `invoice ${invoice.id} for ${formatCents(invoice.amountCents)}: ${invoice.status}${invoice.url ? `, payer view ${invoice.url}` : ""}`,
+          );
+        } catch (err) {
+          failure("Invoice record", err, "PAYPAL_INVOICE_RECORDS=1 needs Invoicing on the REST app");
+        }
+      } else if (deps.invoiceRecords === false) {
+        record("Invoice record", "SKIP", "set PAYPAL_INVOICE_RECORDS=1 to record each charge as a paid PayPal invoice");
       }
     } catch (err) {
       if (looksLikePartialCaptureDisabled(err)) {

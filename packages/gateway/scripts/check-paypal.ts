@@ -3,7 +3,9 @@
  * PAYPAL_MODE=sandbox. It creates a $5.00 hold, waits while you approve it in the browser with the sandbox
  * *personal* account, captures $1.23 with final_capture, checks the rest was released, sends a $0.50 payout
  * to SELLER_PAYPAL_EMAIL_CHANNEL3 (skipped when unset) and prints a pass/fail table with PayPal debug_ids,
- * including whether partial capture is enabled. Exit code 1 when a step failed.
+ * including whether partial capture is enabled. It also lists disputes (read-only, proving the Disputes API
+ * answers) and, with PAYPAL_INVOICE_RECORDS=1, records the $1.23 capture as a paid invoice. Exit code 1 when a
+ * step failed.
  *
  * Needs the sandbox credentials in .env whatever PAYPAL_MODE says. Never prints credentials or tokens.
  */
@@ -71,6 +73,8 @@ async function main(): Promise<void> {
     tokens,
     publicBaseUrl: config.publicBaseUrl,
     payoutReceiver: config.sellerEmails.channel3,
+    checkDisputes: true,
+    invoiceRecords: config.paypal.invoiceRecords,
     waitForApproval: (orderId, approveUrl) => awaitApproval(paypal, config.publicBaseUrl, orderId, approveUrl),
     onRow: (row) => console.log(`  ${paint(row.result, row.result.padEnd(4))}  ${row.step}: ${row.detail}${row.debugId ? `  (debug_id ${row.debugId})` : ""}`),
   });
