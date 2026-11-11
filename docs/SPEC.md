@@ -342,7 +342,8 @@ print a pass/fail table with `debug_id`s.
 
 ### 6.8 Disputes (built Nov 11)
 PayPal disputes on a tab's one charge: Disputes API v1 over REST (`src/disputes/`, `src/routes/disputes.ts`).
-- **Sync**: every 2 min in sandbox (a hook after the scheduler tick), every tick in mock, or `POST /api/disputes/sync`.
+- **Sync**: every 2 min in sandbox (a hook after the scheduler tick), every tick in mock, or `POST /api/disputes/sync`
+  (`{disputeId}` reads one case by ID: PayPal's search lags new sandbox cases).
   Linked to the tab by capture id; disputes on other captures are listed unlinked and touch no balances.
 - **AI jury** (`packages/ai/src/dispute/`, `ai.reviewDispute`): starts on each new linked, unresolved dispute
   (`POST /api/disputes/:id/jury` re-runs it). Prosecutor (the buyer's claim) → defender (the charge stands on the signed
@@ -351,8 +352,9 @@ PayPal disputes on a tab's one charge: Disputes API v1 over REST (`src/disputes/
   the company's own tab (the non-repudiation evidence); the buyer's message is fenced as untrusted evidence. Mock LLM:
   deterministic ledger rules.
 - **Responses** (a human): `POST /api/disputes/:id/actions` `send_evidence` (the draft + a compact ledger summary,
-  ≤ 2,000 chars) | `make_offer` | `accept_claim`. Demo only: `POST /api/disputes/:id/adjudicate {outcome: buyer|seller}`
-  (sandbox adjudicate, or the mock). Mock PayPal only: `POST /api/disputes/mock` (the buyer opens one).
+  ≤ 2,000 chars, as the evidence type PayPal requested) | `make_offer` | `accept_claim`. Demo only:
+  `POST /api/disputes/:id/adjudicate {outcome: buyer|seller}` (the mock settles at once; the sandbox rules only on a
+  claim under review that offers `adjudicate`, so an inquiry is escalated to a claim first). Mock PayPal only: `POST /api/disputes/mock` (the buyer opens one).
 - **Money**: while open, the sellers' net from that charge is held pro rata (amount ÷ charged; a negative net holds
   nothing) and payouts pay available − held. Money back to the buyer is deducted from the sellers pro rata by gross,
   exactly once (`dispute_refunds`, `refund_applied_cents`). Seller favour releases the hold.
@@ -470,7 +472,8 @@ Each requires `x-api-key: demo-<id>-key` (shows the gateway injecting seller key
 - **Jury `/jury`** (built Nov 11): the AI jury's docket, newest first: rogue-agent reports from spend reviews and PayPal
   dispute cases (§6.8). "The record" strip (one mark per case, colored by outcome), filter chips (All, Rogue agents,
   Disputes, Open), debate transcripts, the jury's recommendation and an editable response (Send evidence / Offer refund /
-  Accept claim), and a sandbox simulation box in demo mode. "Sync with PayPal"; "Simulate a dispute" in mock mode.
+  Accept claim), and a sandbox simulation box in demo mode. "Sync with PayPal" with an optional case ID; "Simulate a
+  dispute" in mock mode.
   Linked from the console when an agent is frozen, from statements, Sellers and the terminal.
 - **Sellers `/sellers`**: seller cards (prices, balance, paid out, void rate), "List your API" form
   (base URL, auth header, key, PayPal email, endpoints + prices, void-rule toggles), "Run payouts" button,
