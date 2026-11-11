@@ -11,6 +11,7 @@ import type { GridApi } from "ag-grid-community";
 import { exportMultipleSheetsAsExcel } from "ag-grid-enterprise";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { Badge, Button, Callout, Card, PageHeader, useToast } from "../components";
+import { OpenDisputesLink } from "../features/jury/OpenDisputesLink";
 import { AskLedger } from "../features/terminal/AskLedger";
 import { fileStamp } from "../features/terminal/exporting";
 import { LedgerFeed } from "../features/terminal/feed";
@@ -161,6 +162,7 @@ export default function Terminal() {
           description="Every IOU as it clears: signed per call, voided when the data is bad, settled in one PayPal charge."
           actions={
             <div className="tx-head-actions">
+              <OpenDisputesLink />
               <LiveBadge status={status} />
               <Button size="sm" onClick={exportLedger} title="IOUs, settlements and payouts as one Excel workbook">
                 Export ledger
