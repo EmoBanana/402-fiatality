@@ -22,10 +22,15 @@ import type {
   CompanyCreateDTO,
   CompanyDTO,
   ConfigDTO,
+  DisputeActionRequestDTO,
+  DisputeAdjudicateDTO,
+  DisputeDTO,
+  DisputeSyncResultDTO,
   GridQueryRequestDTO,
   GridQueryResponseDTO,
   HealthDTO,
   MetricsSummaryDTO,
+  MockDisputeCreateDTO,
   OkDTO,
   PayoutDTO,
   PayoutRunDTO,
@@ -206,6 +211,21 @@ export const api = {
 
   settlements: {
     list: (query: { tabId?: string } = {}, signal?: AbortSignal) => get<SettlementDTO[]>("/api/settlements", query, signal),
+  },
+
+  /** PayPal disputes on tabs' charges and the AI jury's hearing of each. */
+  disputes: {
+    list: (signal?: AbortSignal) => get<DisputeDTO[]>("/api/disputes", undefined, signal),
+    get: (id: string, signal?: AbortSignal) => get<DisputeDTO>(`/api/disputes/${seg(id)}`, undefined, signal),
+    /** Pulls new and changed disputes from PayPal. */
+    sync: () => post<DisputeSyncResultDTO>("/api/disputes/sync"),
+    /** Runs the AI jury again; its messages stream as `dispute.message`. */
+    rehear: (id: string) => post<DisputeDTO>(`/api/disputes/${seg(id)}/jury`),
+    act: (id: string, body: DisputeActionRequestDTO) => post<DisputeDTO>(`/api/disputes/${seg(id)}/actions`, body),
+    /** Sandbox and mock only: settle the dispute for the demo. */
+    adjudicate: (id: string, body: DisputeAdjudicateDTO) => post<DisputeDTO>(`/api/disputes/${seg(id)}/adjudicate`, body),
+    /** Mock mode only: the buyer opens a dispute on a settled tab's charge. */
+    simulate: (body: MockDisputeCreateDTO) => post<DisputeDTO>("/api/disputes/mock", body),
   },
 
   payouts: {
