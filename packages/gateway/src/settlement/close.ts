@@ -18,6 +18,7 @@ import { AppError, type CloseReason } from "../context";
 import { type Db, stmt, tx } from "../db/db";
 import { getSettlementDTO, type SellerRow, type SettlementRow, type TabRow, voidRulesOf } from "../db/dto";
 import { PaypalError } from "../paypal/errors";
+import { queueInvoice } from "./invoices";
 import { allocateLines, estimatedFeeCents, noteToPayer, planSettlement } from "./math";
 import {
   addCarry,
@@ -84,7 +85,9 @@ async function closeLocked(ctx: SettlementContext, tabId: string, reason: CloseR
     failSettlement(ctx, tabId, settlement.id, err);
     throw err;
   }
-  return completeSettlement(ctx, requireTab(db, tabId), settlement, outcome);
+  const completed = completeSettlement(ctx, requireTab(db, tabId), settlement, outcome);
+  if (completed.chargedCents > 0) queueInvoice(ctx, completed.id);
+  return completed;
 }
 
 /** The paywall aborts every forwarded call after its seller's `timeoutMs`, so this is how long the tab's calls in flight can last. */
