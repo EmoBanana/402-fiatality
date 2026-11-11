@@ -1,5 +1,6 @@
-// Inter with the optical-size axis: big headings get the display cut automatically.
-import "@fontsource-variable/inter/opsz.css";
+// Hanken Grotesk for every word you read; DSEG7 only for the brand's 4:02 display, like a digital clock.
+import "@fontsource-variable/hanken-grotesk";
+import "@fontsource/dseg7/classic-700.css";
 import "@fontsource-variable/jetbrains-mono";
 import "./styles/tokens.css";
 import "./styles/base.css";

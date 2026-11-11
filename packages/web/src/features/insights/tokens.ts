@@ -50,7 +50,7 @@ export function readTokens(mode: ResolvedTheme): Tokens {
     danger: v("danger", "#b42318"),
     warning: v("warning", "#b54708"),
     series: FALLBACK_SERIES.map((fallback, i) => v(`series-${i + 1}`, fallback)),
-    fontSans: v("font-sans", "Inter Variable, ui-sans-serif, system-ui, sans-serif"),
+    fontSans: v("font-sans", "Hanken Grotesk Variable, ui-sans-serif, system-ui, sans-serif"),
     fontMono: v("font-mono", "JetBrains Mono Variable, ui-monospace, monospace"),
   };
 }

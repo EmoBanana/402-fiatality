@@ -20,8 +20,6 @@ body {
   font-family: var(--font-sans);
   font-size: var(--text-14);
   line-height: var(--leading-body);
-  /* Inter: l with a tail and I with serifs keep ids and "IOU" unambiguous. */
-  font-feature-settings: "cv05", "cv08";
   font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

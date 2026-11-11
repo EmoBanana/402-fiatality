@@ -3,7 +3,7 @@
  *
  * Layout helpers other pages may use directly:
  *   .ui-stack (vertical rhythm, --stack-gap)   .ui-cluster (wrapping row, --cluster-gap)
- *   .ui-eyebrow (small uppercase label)         .ui-section-head (title + actions row)
+ *   .ui-eyebrow (small caps kicker over a title) .ui-section-head (title + actions row)
  *   .ui-ledger* (the IOU tape: mono rows, struck voids, single rule over a subtotal, double rule under the
  *   one charge) - see the block near the end of this file.
  */
@@ -26,12 +26,11 @@
 }
 
 .ui-eyebrow {
-  font-family: var(--font-mono);
   font-size: var(--text-12);
-  font-weight: var(--weight-medium);
-  letter-spacing: var(--tracking-caps);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--accent);
 }
 
 .ui-section-head {
@@ -99,20 +98,48 @@
   text-decoration: none;
 }
 
+/* The 4:02 display (components/Logo.tsx): lit amber segments over faint unlit ones, the colon ticking. */
 .ui-monogram {
   display: inline-grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
   flex-shrink: 0;
-  border-radius: 7px;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-family: var(--font-mono);
-  font-size: 11px;
+  height: 2em;
+  padding: 0 0.5em;
+  border-radius: 6px;
+  background: var(--mark-dial);
+  font-family: var(--font-digits);
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: -0.04em;
   line-height: 1;
+}
+
+.ui-monogram > span {
+  grid-area: 1 / 1;
+}
+
+.ui-monogram-ghost {
+  color: var(--mark-hands);
+  opacity: 0.1;
+}
+
+.ui-monogram-lit {
+  color: var(--mark-accent);
+}
+
+.ui-monogram-colon {
+  animation: ui-colon-tick 2s steps(1, end) infinite;
+}
+
+@keyframes ui-colon-tick {
+  50% {
+    opacity: 0.15;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-monogram-colon {
+    animation: none;
+  }
 }
 
 .ui-nav {
@@ -724,26 +751,25 @@
 }
 
 .ui-stat-label {
-  font-size: var(--text-12);
-  font-weight: var(--weight-medium);
+  font-size: 11px;
+  font-weight: var(--weight-semibold);
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
 }
 
 .ui-stat-value {
-  font-family: var(--font-mono);
   font-size: var(--text-20);
-  font-weight: var(--weight-medium);
+  font-weight: var(--weight-semibold);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   line-height: var(--leading-tight);
   color: var(--ink);
 }
 
 .ui-stat--lg .ui-stat-value {
   font-size: var(--text-28);
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
 }
 
 .ui-stat-hint {
@@ -1159,6 +1185,11 @@
   color: var(--muted);
 }
 
+/* A headline figure sets its money in the figure's own face, not the ledger's mono. */
+.ui-stat-value .ui-money {
+  font-family: inherit;
+}
+
 /* Invisible digits that keep decimal points aligned down a column (<Money padTo={4} />). */
 .ui-money-pad {
   visibility: hidden;
@@ -1431,18 +1462,30 @@
   align-items: center;
   gap: 10px;
   color: var(--ink);
-  font-size: 16px;
-  letter-spacing: -0.02em;
+  font-size: 15px;
 }
 
-/* "Fiat" carries the weight; "ality" is set lighter. */
+/* The wordmark in segment letters (components/Logo.tsx), stroked in the text color. */
 .ui-wordmark {
-  font-weight: var(--weight-regular);
-  white-space: nowrap;
+  display: block;
+  height: 0.93em;
+  width: auto;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: butt;
 }
 
-.ui-wordmark b {
-  font-weight: 650;
+.ui-logo-full {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+}
+
+.ui-logo-402 {
+  font-family: var(--font-digits);
+  font-weight: 700;
 }
 
 /* ------------------------------------------------------------ placeholder (Phase 0 pages) */
@@ -1520,10 +1563,10 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-family: var(--font-mono);
-  font-size: var(--text-12);
+  font-family: var(--font-sans);
+  font-size: 11px;
   font-weight: var(--weight-semibold);
-  letter-spacing: var(--tracking-caps);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink);
 }

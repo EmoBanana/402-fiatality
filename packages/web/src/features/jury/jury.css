@@ -1,10 +1,10 @@
 /* The AI jury's docket (pages/Jury.tsx). Prefix `jy-`. Reads tokens only. Designed for 1024 px and up. */
 
 .jy-label {
-  font-family: var(--font-mono);
-  font-size: var(--text-12);
-  font-weight: var(--weight-medium);
-  letter-spacing: var(--tracking-caps);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -302,10 +302,10 @@
 }
 
 .jy-case-kind {
-  font-family: var(--font-mono);
-  font-size: var(--text-12);
-  font-weight: var(--weight-medium);
-  letter-spacing: 0.06em;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
 }
