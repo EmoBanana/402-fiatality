@@ -77,7 +77,6 @@ function Simulation({ dispute, onUpdate }: { dispute: DisputeDTO; onUpdate: (d: 
   if (!config?.demo || (config.paypalMode !== "sandbox" && config.paypalMode !== "mock")) return null;
   // Once the seller accepts the claim, PayPal refunds the buyer and closes the case without a ruling.
   if (dispute.actions.some((a) => a.kind === "accept_claim" && a.ok)) return null;
-  const where = config.paypalMode === "mock" ? "In mock mode" : "In PayPal's sandbox";
 
   async function rule(outcome: "buyer" | "seller") {
     setBusy(outcome);
@@ -92,22 +91,18 @@ function Simulation({ dispute, onUpdate }: { dispute: DisputeDTO; onUpdate: (d: 
           description: "In a few minutes PayPal asks the seller to answer the claim. Send evidence again, then rule once PayPal is reviewing it.",
         });
       } else {
-        toast({ tone: "success", title: outcome === "buyer" ? "Ruled for the buyer (simulation)" : "Ruled for the seller (simulation)" });
+        toast({ tone: "success", title: outcome === "buyer" ? "Ruled for the buyer" : "Ruled for the seller" });
       }
     } catch (err) {
-      toast({ tone: "danger", ...describeError(err, "Couldn't simulate PayPal's ruling") });
+      toast({ tone: "danger", ...describeError(err, "Couldn't settle the case") });
     } finally {
       setBusy(null);
     }
   }
 
   return (
-    <section className="jy-sim" aria-label="Sandbox simulation">
-      <p className="jy-label">Sandbox simulation</p>
-      <p className="jy-note">
-        PayPal decides real disputes. {where} you can rule yourself to see what happens next: a ruling for the buyer refunds them and takes it back from the tab's sellers.
-        {config.paypalMode === "sandbox" ? " The sandbox rules only on a claim under its review, so ruling on an inquiry escalates it to a claim first." : null}
-      </p>
+    <section className="jy-sim" aria-label="PayPal's ruling">
+      <p className="jy-label">PayPal's ruling</p>
       <div className="ui-cluster">
         <Button size="sm" onClick={() => rule("buyer")} loading={busy === "buyer"} disabled={Boolean(busy)}>
           Rule for buyer

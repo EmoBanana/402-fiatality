@@ -140,7 +140,7 @@ export default function Sellers() {
               <Card>
                 <EmptyState
                   title="No APIs listed yet"
-                  description="List one to let agents pay for it per call. In demo mode the gateway seeds three."
+                  description="List one to let agents pay for it per call."
                   action={
                     <Button variant="primary" onClick={openForm}>
                       List your API

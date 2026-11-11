@@ -58,7 +58,7 @@ export function NewTab({ companies, companyId, onCompanyChange, onCreated }: New
   const checked = useMemo(() => (draft ? policyFromDraft(draft) : null), [draft]);
   const edited = Boolean(draft && baseDraft && !sameDraft(draft, baseDraft));
   // Starts a sentence wherever it is shown, hence the capital.
-  const modelName = config ? (config.llm.provider === "mock" ? "The mock model" : modelLabel(config.llm.model)) : "Gemma 4";
+  const modelName = config ? (config.llm.provider === "mock" ? "The built-in rules" : modelLabel(config.llm.model)) : "Gemma 4";
 
   async function addCompany(e: FormEvent) {
     e.preventDefault();

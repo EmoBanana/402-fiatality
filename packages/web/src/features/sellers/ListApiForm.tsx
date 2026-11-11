@@ -154,7 +154,7 @@ export function ListApiForm({ onCreated, onBusyChange }: { onCreated: (seller: S
           onChange={(e) => setBaseUrl(e.target.value)}
           placeholder="https://api.example.com"
           error={errors.baseUrl}
-          hint="Where the gateway forwards paid calls. https only (http://localhost works in demo mode)."
+          hint="Where the gateway forwards paid calls, over https."
           inputMode="url"
         />
         <div className="sl-grid">

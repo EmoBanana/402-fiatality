@@ -123,7 +123,7 @@ export function TabCard({ tab }: { tab: TabDTO }) {
         <DescriptionList items={details} dense />
         {demoOffsetMs > 0 ? (
           <p className="cs-tabcard-clock">
-            <Badge tone="warning">Demo clock +{formatDuration(demoOffsetMs)}</Badge>
+            <Badge tone="warning">Clock +{formatDuration(demoOffsetMs)}</Badge>
           </p>
         ) : null}
       </div>

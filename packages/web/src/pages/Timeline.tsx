@@ -54,7 +54,7 @@ export default function Timeline() {
     setAdvancing(true);
     try {
       const dto = await clock.advance(DAY);
-      toast({ title: "A day later", description: `Demo time is now ${formatDateTime(dto.now)}. The gateway ran its settlement scheduler.` });
+      toast({ title: "A day later", description: `It's now ${formatDateTime(dto.now)}. The gateway ran its settlement scheduler.` });
       // The scheduler's tab.updated events usually arrive first; refetch anyway in case any were missed.
       window.setTimeout(reload, 900);
     } catch (err) {
@@ -69,11 +69,11 @@ export default function Timeline() {
   const actions = (
     <div className="tl-actions">
       <span className="tl-clock" title={clock.available ? "Gateway clock" : "Browser clock (gateway clock unavailable)"}>
-        <span className="tl-clock-label">{demo ? "Demo clock" : "Gateway clock"}{ahead ? ` · ${formatDuration(clock.offsetMs)} ahead` : ""}</span>
+        <span className="tl-clock-label">Gateway clock{ahead ? ` · ${formatDuration(clock.offsetMs)} ahead` : ""}</span>
         <span className="tl-clock-value">{formatDateTime(clock.now)}</span>
       </span>
       {demo ? (
-        <Button variant="secondary" onClick={advance} loading={advancing} title="Fast-forward the demo clock by one day">
+        <Button variant="secondary" onClick={advance} loading={advancing} title="Move the gateway clock ahead one day">
           +1 day
         </Button>
       ) : null}
@@ -163,7 +163,7 @@ export default function Timeline() {
             <span className="tl-swatch tl-swatch--now" aria-hidden="true" />
             Now
           </span>
-          <span className="tl-legend-note">{demo ? "Drag a planned charge to reschedule it." : "Rescheduling is available in demo mode."}</span>
+          {demo ? <span className="tl-legend-note">Drag a planned charge to reschedule it.</span> : null}
         </div>
         <Suspense
           fallback={

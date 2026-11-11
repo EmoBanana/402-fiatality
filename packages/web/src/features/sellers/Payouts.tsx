@@ -23,8 +23,8 @@ import { upsertById, useResource } from "../../lib/resource";
 
 const THRESHOLDS = [
   { cents: 1000, label: "$10.00 (weekly rule)" },
-  { cents: 100, label: "$1.00 (demo)" },
-  { cents: 10, label: "$0.10 (demo)" },
+  { cents: 100, label: "$1.00" },
+  { cents: 10, label: "$0.10" },
 ];
 
 export function Payouts({ thresholdCents, onThresholdChange, onPaid }: { thresholdCents: number; onThresholdChange: (cents: number) => void; onPaid: () => void }) {

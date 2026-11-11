@@ -247,13 +247,13 @@ export const ACTION_LABEL: Record<DisputeDTO["actions"][number]["kind"], string>
   make_offer: "Refund offered",
   accept_claim: "Claim accepted",
   escalate: "Escalated to a PayPal claim",
-  sandbox_adjudicate: "Sandbox ruling",
+  sandbox_adjudicate: "PayPal ruling",
 };
 
 /** Who heard the case: "Gemma 4 · 12b", or "LLM mock" for the offline stand-in (as the header badge says). */
 export function juryModelLabel(model: string | null | undefined): string {
   if (!model) return "The AI";
-  return model === "mock" ? "LLM mock" : modelLabel(model);
+  return model === "mock" ? "Built-in rules" : modelLabel(model);
 }
 
 /** 0.92 -> 92 (null when unknown). */

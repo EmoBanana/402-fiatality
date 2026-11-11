@@ -24,7 +24,7 @@ describe("format", () => {
   });
 
   it("labels models and shortens ids", () => {
-    expect(modelLabel("gemma4:12b")).toBe("Gemma 4 · 12b");
+    expect(modelLabel("gemma4:12b")).toBe("Gemma 4");
     expect(shortId("tab_k3x9q2m1v8p0w7")).toBe("tab_k3x9…w7");
   });
 });

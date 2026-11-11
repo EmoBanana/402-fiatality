@@ -99,8 +99,7 @@ export function shortId(id: string, head = 4, tail = 2): string {
 /** "gemma4:12b" -> "Gemma 4 · 12b"; other model names pass through. */
 export function modelLabel(model: string): string {
   const match = /^gemma(\d+)(?::(.+))?$/i.exec(model);
-  if (!match) return model;
-  return match[2] ? `Gemma ${match[1]} · ${match[2]}` : `Gemma ${match[1]}`;
+  return match ? `Gemma ${match[1]}` : model;
 }
 
 /** "1 call", "3 calls"; pass `many` for irregular plurals. Counts are formatted (1,204 calls). */

@@ -27,7 +27,7 @@ const DEFAULT_TASK: Record<AgentMode, string> = {
 
 const MODE_HINT: Record<AgentMode, string> = {
   llm: "decides each paid call and says why it's worth the price.",
-  scripted: "A fixed demo sequence: search, three product details, price history, reviews (some fail and are voided).",
+  scripted: "A fixed sequence: search, three product details, price history, reviews (some fail and are voided).",
   runaway: "Repeats the same paid search to trip the loop alarm, pause the tab and start an AI review.",
 };
 
@@ -56,8 +56,8 @@ export function AgentPanel({ tab, runs, onRun }: AgentPanelProps) {
   const [stopping, setStopping] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const modelName = config ? (config.llm.provider === "mock" ? "The mock model" : modelLabel(config.llm.model)) : "Gemma 4";
-  const llmOption = config?.llm.provider === "mock" ? "Mock LLM" : modelName.replace(/ · .*/, "");
+  const modelName = config ? (config.llm.provider === "mock" ? "The built-in rules" : modelLabel(config.llm.model)) : "Gemma 4";
+  const llmOption = config?.llm.provider === "mock" ? "Built-in rules" : modelName;
   const run = runs.find((r) => r.id === selectedId) ?? runs[0] ?? null;
   const runningCount = runs.filter((r) => r.status === "running").length;
 

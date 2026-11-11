@@ -133,7 +133,7 @@ describe("jury docket", () => {
     expect(sentenceCase("RESOLVED_WITH_PAYOUT")).toBe("Resolved with payout");
     expect(confidencePct(0.916)).toBe(92);
     expect(confidencePct(null)).toBeNull();
-    expect(juryModelLabel("gemma4:12b")).toBe("Gemma 4 · 12b");
-    expect(juryModelLabel("mock")).toBe("LLM mock");
+    expect(juryModelLabel("gemma4:12b")).toBe("Gemma 4");
+    expect(juryModelLabel("mock")).toBe("Built-in rules");
   });
 });

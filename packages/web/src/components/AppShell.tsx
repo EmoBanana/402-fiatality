@@ -50,12 +50,8 @@ function ModeBadges() {
   const llmDown = !llmMock && health?.llm.reachable === false;
   return (
     <>
-      <Badge
-        tone={sandbox ? "accent" : "neutral"}
-        dot
-        title={sandbox ? "Holds and charges go to PayPal's sandbox" : "PayPal is simulated offline; nothing leaves this machine"}
-      >
-        PayPal {config.paypalMode}
+      <Badge tone={sandbox ? "accent" : "neutral"} dot title={sandbox ? "Holds, charges, invoices and payouts go through PayPal" : "Offline: nothing leaves this machine"}>
+        PayPal
       </Badge>
       <Badge
         tone={llmDown ? "warning" : "neutral"}
@@ -68,7 +64,7 @@ function ModeBadges() {
               : `${config.llm.provider} · ${config.llm.model}`
         }
       >
-        {llmMock ? "LLM mock" : modelLabel(config.llm.model)}
+        {llmMock ? "Built-in rules" : modelLabel(config.llm.model)}
       </Badge>
     </>
   );

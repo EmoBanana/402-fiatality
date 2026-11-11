@@ -252,7 +252,7 @@ export default function Jury() {
         await docket.reload();
       }
     } catch (err) {
-      toast({ tone: "danger", ...describeError(err, "Couldn't simulate a dispute") });
+      toast({ tone: "danger", ...describeError(err, "Couldn't open a dispute") });
     } finally {
       setBusy(null);
     }
@@ -316,8 +316,8 @@ export default function Jury() {
         actions={
           <>
             {mock ? (
-              <Button onClick={simulate} loading={busy === "simulate"} disabled={Boolean(busy) || !docket.disputesReady} title="Mock mode: a buyer disputes the newest settled tab's charge">
-                Simulate a dispute
+              <Button onClick={simulate} loading={busy === "simulate"} disabled={Boolean(busy) || !docket.disputesReady} title="The buyer disputes the newest settled tab's charge">
+                Open a dispute
               </Button>
             ) : null}
             <form className="jy-sync" onSubmit={sync}>
@@ -377,7 +377,7 @@ export default function Jury() {
                 action={
                   filter === "disputes" && mock && docket.disputesReady ? (
                     <Button onClick={simulate} loading={busy === "simulate"} disabled={Boolean(busy)}>
-                      Simulate a dispute
+                      Open a dispute
                     </Button>
                   ) : filter === "all" || filter === "rogue" ? (
                     <Link to="/console" className={buttonClassName({ variant: "secondary" })}>

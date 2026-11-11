@@ -298,7 +298,7 @@ export function buildTimeline(
           detail: [
             `Planned ${formatDateTime(tab.closeAt)}`,
             `Billable so far ${formatUsd(tab.totals.billableMicros)}; closes early at ${formatCents(policy.closeAtCents)}.`,
-            ...(demo ? ["Drag to reschedule (demo)."] : []),
+            ...(demo ? ["Drag to reschedule."] : []),
           ],
         }),
       );
@@ -369,7 +369,7 @@ export function validateCharge(tab: TabDTO | undefined, at: number, now: number)
   if (!tab) return "Unknown tab.";
   if (!isOpen(tab)) return "This tab is already settled.";
   const a = tab.authorizedAt ?? now;
-  if (at <= now) return "Pick a time after the demo clock's now.";
+  if (at <= now) return "Pick a later time.";
   if (at <= a) return "The charge must come after the hold.";
   const expires = tab.expiresAt ?? a + 29 * DAY;
   if (at > expires - HOUR) return `The authorization expires ${formatDateTime(expires)}.`;

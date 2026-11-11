@@ -96,7 +96,7 @@ export default function Insights() {
   const paidCalls = settled.reduce((s, p) => s + p.calls, 0);
   const multiple = savingsMultiple(fees.naiveFeeCents, fees.feeCents);
   const llm = data.config?.llm;
-  const aiLabel = !llm ? "AI · Gemma" : llm.provider === "mock" ? "AI · mock LLM" : `AI · ${modelLabel(ai.state === "ok" ? ai.model : llm.model)}`;
+  const aiLabel = !llm ? "AI · Gemma" : llm.provider === "mock" ? "AI · built-in rules" : `AI · ${modelLabel(ai.state === "ok" ? ai.model : llm.model)}`;
 
   if (data.status === "loading") {
     return (
