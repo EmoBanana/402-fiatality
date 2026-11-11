@@ -7,13 +7,14 @@ import type { AiService, LlmClient, LlmConfig } from "@p402/gateway/context";
 import { chatProxy } from "./chat/proxy";
 import { gridQuery } from "./grid/query";
 import { createLlm } from "./llm";
+import { runDisputeJury } from "./dispute/jury";
 import { parsePolicyWithLlm, parsePolicyWithRules } from "./policy/parse";
 import { runReview } from "./review/review";
 
 export interface AiServiceOptions {
   /** Use this client instead of createLlm(config). */
   llm?: LlmClient;
-  /** Total time for one spend review before it escalates (default 45 s). */
+  /** Total time for one spend review (or dispute hearing) before it escalates (default 45 s). */
   reviewBudgetMs?: number;
   /** Mock provider only: pause between review messages so the UI shows the debate streaming (default 0). */
   mockDelayMs?: number;
@@ -46,6 +47,9 @@ export function createAiService(config: LlmConfig, opts: AiServiceOptions = {}):
     },
     reviewSpend(input, onMessage, signal) {
       return runReview(llm, input, onMessage, signal, { budgetMs: opts.reviewBudgetMs, mockDelayMs: opts.mockDelayMs, now });
+    },
+    reviewDispute(input, onMessage, signal) {
+      return runDisputeJury(llm, input, onMessage, signal, { budgetMs: opts.reviewBudgetMs, mockDelayMs: opts.mockDelayMs, now });
     },
     gridQuery(request) {
       return gridQuery(llm, request, now());

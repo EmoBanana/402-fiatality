@@ -17,6 +17,7 @@ import type {
   CatalogEntryDTO,
   ChatRequestDTO,
   ChatResponseDTO,
+  DisputeRecommendation,
   GridQueryRequestDTO,
   GridQueryResponseDTO,
   Micros,
@@ -80,6 +81,8 @@ export interface PaypalOrder {
   status: string;
   /** Where the payer approves (link rel "payer-action" or "approve"); null once approved. */
   approveUrl: string | null;
+  /** The payer's PayPal email once known (payment_source.paypal.email_address, or the deprecated payer). */
+  payerEmail?: string | null;
 }
 
 export interface PaypalAuthorization {
@@ -123,6 +126,86 @@ export interface PaypalPayoutBatch {
   /** batch_status: PENDING | PROCESSING | SUCCESS | DENIED ... */
   status: string;
   items: PaypalPayoutItem[];
+}
+
+/** A dispute as Disputes v1 lists it (GET /v1/customer/disputes). Times are epoch ms (PayPal's real time). */
+export interface PaypalDisputeSummary {
+  /** dispute_id, e.g. PP-D-27803 (MOCK-D-... in mock mode). */
+  id: string;
+  /** OPEN | WAITING_FOR_BUYER_RESPONSE | WAITING_FOR_SELLER_RESPONSE | UNDER_REVIEW | RESOLVED | OTHER */
+  status: string;
+  /** dispute reason, e.g. MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED or UNAUTHORISED. */
+  reason: string;
+  /** dispute_life_cycle_stage: INQUIRY | CHARGEBACK | PRE_ARBITRATION | ARBITRATION. */
+  stage: string | null;
+  /** dispute_amount in cents. */
+  amountCents: number;
+  createdAt: number | null;
+  updatedAt: number | null;
+}
+
+/** GET /v1/customer/disputes/{id}, reduced to what 402 Fiatality uses. */
+export interface PaypalDispute extends PaypalDisputeSummary {
+  /** disputed_transactions[].seller_transaction_id: the disputed capture ids (our tab charges). */
+  captureIds: string[];
+  /** dispute_outcome.outcome_code once resolved, e.g. RESOLVED_BUYER_FAVOUR. */
+  outcome: string | null;
+  /**
+   * Money PayPal reports as given back to the buyer: dispute_outcome.amount_refunded, else the seller's
+   * DISPUTE_SETTLEMENT debits in money_movements, else refund_details.transactions. Null when PayPal reports none.
+   */
+  refundedCents: number | null;
+  /** The buyer's latest message (untrusted text). */
+  buyerMessage: string | null;
+  sellerResponseDueAt: number | null;
+  /**
+   * What PayPal lets the seller do now, from the HATEOAS links, normalized to snake_case:
+   * provide_evidence, send_message, make_offer, accept_claim, escalate, adjudicate, require_evidence, ...
+   */
+  actions: string[];
+}
+
+export type PaypalAdjudication = "BUYER_FAVOR" | "SELLER_FAVOR";
+
+/** Payments v2 refund of a capture. */
+export interface PaypalRefund {
+  id: string;
+  /** CANCELLED | FAILED | PENDING | COMPLETED */
+  status: string;
+  amountCents: number;
+}
+
+/** Invoicing v2: a paid invoice recorded for one tab charge (draft -> sent as a share link -> payment recorded). */
+export interface PaypalInvoiceInput {
+  /** detail.invoice_number, at most 25 characters (FIAT-<settlementId>). */
+  invoiceNumber: string;
+  /** detail.reference (the tab id). */
+  reference: string;
+  /** primary_recipients[0].billing_info.email_address; omitted when unknown. */
+  recipientEmail: string | null;
+  itemName: string;
+  /** Per-seller gross and calls, and the capture id (≤ 1000 characters). */
+  itemDescription: string;
+  amountCents: number;
+  /** detail.note to the recipient. */
+  note: string;
+  /** detail.memo, private to the merchant. */
+  memo: string;
+  /** Note on the recorded payment (names the capture). */
+  paymentNote: string;
+  /** PayPal-Request-Id for the draft. */
+  requestId: string;
+}
+
+export interface PaypalInvoice {
+  /** INV2-... (MOCK-INV-... in mock mode). */
+  id: string;
+  invoiceNumber: string;
+  /** DRAFT | SENT | UNPAID | PAID | MARKED_AS_PAID ... */
+  status: string;
+  amountCents: number;
+  /** detail.metadata.recipient_view_url or the payer-view link from send. */
+  url: string | null;
 }
 
 /**
@@ -175,6 +258,39 @@ export interface PaypalClient {
     items: PaypalPayoutItemInput[];
   }): Promise<PaypalPayoutBatch>;
   getPayoutBatch(batchId: string): Promise<PaypalPayoutBatch>;
+
+  // ---- Disputes v1 (REST). Times are PayPal's real time, epoch ms.
+  /** Disputes updated after `updatedAfter` (all of the last 180 days when omitted), newest first, all pages. */
+  listDisputes(input?: { updatedAfter?: number | null; disputedTransactionId?: string | null }): Promise<PaypalDisputeSummary[]>;
+  getDispute(disputeId: string): Promise<PaypalDispute>;
+  /** multipart/form-data with an `input` JSON part: { evidences: [{ evidence_type, notes, evidence_info? }] }. */
+  provideDisputeEvidence(disputeId: string, input: { notes: string; evidenceType?: string; refundIds?: string[] }): Promise<void>;
+  /** Only while the dispute is an INQUIRY. */
+  sendDisputeMessage(disputeId: string, message: string): Promise<void>;
+  /** offer_type REFUND for `amountCents`; only while the dispute is an INQUIRY. */
+  makeDisputeOffer(disputeId: string, input: { amountCents: number; note: string; invoiceId?: string | null }): Promise<void>;
+  /** accept_claim_type REFUND, or PARTIAL_REFUND with refund_amount when `refundCents` is below the disputed amount. */
+  acceptDisputeClaim(disputeId: string, input: { note: string; refundCents?: number | null; invoiceId?: string | null }): Promise<void>;
+  /** Escalate an INQUIRY to a PayPal claim. */
+  escalateDispute(disputeId: string, note: string): Promise<void>;
+  /** Sandbox-only "settle dispute" (the mock too): adjudication_outcome BUYER_FAVOR | SELLER_FAVOR. */
+  adjudicateDispute(disputeId: string, outcome: PaypalAdjudication): Promise<void>;
+  /** Sandbox-only "update dispute status": UNDER_REVIEW -> waiting for buyer or seller evidence. */
+  requireDisputeEvidence(disputeId: string, action: "BUYER_EVIDENCE" | "SELLER_EVIDENCE"): Promise<void>;
+
+  // ---- Payments v2
+  /** Refund a capture (all of it when amountCents is omitted). */
+  refundCapture(
+    captureId: string,
+    input: { amountCents?: number | null; invoiceId: string; noteToPayer: string; requestId: string },
+  ): Promise<PaypalRefund>;
+
+  // ---- Invoicing v2 (REST)
+  /**
+   * Record a charge as a paid invoice: create the draft, send it as a share link (send_to_recipient false),
+   * record the payment. Resumes an earlier attempt with the same invoice number instead of failing.
+   */
+  createInvoiceRecord(input: PaypalInvoiceInput): Promise<PaypalInvoice>;
 }
 
 // ===================================================================== Settlement (paypal-builder)
@@ -269,6 +385,84 @@ export interface SpendReviewResult {
   model: string;
 }
 
+/** One seller's part of the disputed charge. */
+export interface DisputeReviewSeller {
+  sellerId: string;
+  sellerName: string | null;
+  calls: number;
+  grossMicros: Micros;
+}
+
+/**
+ * Everything the dispute jury hears. All fields are trusted facts computed from the gateway's ledger, except
+ * `buyerMessage`, which is the buyer's own text from PayPal (untrusted: fenced as evidence, never instructions).
+ */
+export interface DisputeReviewInput {
+  disputeId: string;
+  /** PayPal's reason code, e.g. UNAUTHORISED or MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED. */
+  reason: string;
+  status: string;
+  stage: string | null;
+  /** The disputed amount. */
+  amountCents: number;
+  buyerMessage: string | null;
+  companyName: string | null;
+  tab: {
+    id: string;
+    holdCents: number;
+    /** Judged calls (accepted + voided). */
+    calls: number;
+    voided: number;
+    voidedMicros: Micros;
+    authorizedAt: number | null;
+    closedAt: number | null;
+  };
+  settlement: {
+    id: string;
+    captureId: string | null;
+    chargedCents: number;
+    /** Billed (accepted) calls in this charge. */
+    callCount: number;
+    paypalFeeCents: number;
+  };
+  sellers: DisputeReviewSeller[];
+  /** The tab's voided calls by void reason (never billed). */
+  voidsByReason: Record<string, number>;
+  /** Every billed call carries an Ed25519-signed IOU; the gateway re-verifies them against the tab's enrolled keys. */
+  signatures: {
+    billedCalls: number;
+    /** Billed calls whose signature verifies with a key enrolled on this company's own tab. */
+    verified: number;
+    /** Agent keys enrolled on the tab (by the company's enroll token). */
+    enrolledKeys: number;
+    agentIds: string[];
+    samples: Array<{ voucherId: string; requestHash: string; agentId: string | null }>;
+  };
+  /** The tab's AI spend reviews and their verdicts, oldest first. */
+  reviews: Array<{ alarmKind: string | null; verdict: string | null; fault: string | null; reason: string | null; decidedBy: string | null }>;
+  /** Billed calls that repeated an earlier identical request (same seller and request hash) on this charge. */
+  repeats: { calls: number; micros: Micros; sellerId: string | null; label: string | null };
+  /** A spend review froze the tab (the company's own agent ran away). */
+  frozenByReview: boolean;
+}
+
+export interface DisputeReviewResult {
+  recommendation: DisputeRecommendation;
+  /** contest: 0; partial_refund: 1 .. amount - 1; accept: the refund (usually the full disputed amount). */
+  refundCents: number;
+  confidence: number;
+  /** One sentence. */
+  reason: string;
+  /** The response drafted for PayPal: evidence notes (contest) or the offer/acceptance note. */
+  draft: string;
+  transcript: ReviewMessageDTO[];
+  model: string;
+  /** The model failed or ran out of time; the recommendation comes from the ledger rules. */
+  failed?: boolean;
+  /** Why it failed, when it did. */
+  error?: string | null;
+}
+
 export interface AiService {
   readonly llm: LlmClient;
   /** Plain-English budget -> Policy (SPEC §7). Falls back to the regex parser when the model is down. */
@@ -279,6 +473,16 @@ export interface AiService {
     onMessage: (message: ReviewMessageDTO) => void,
     signal?: AbortSignal,
   ): Promise<SpendReviewResult>;
+  /**
+   * The dispute jury: prosecutor (the buyer's claim) -> defender (the charge stands on the signed ledger) -> judge.
+   * `onMessage` fires as each role finishes. Never throws: a model failure or the review budget ends in
+   * `failed: true` with the ledger rules' recommendation as a fallback.
+   */
+  reviewDispute(
+    input: DisputeReviewInput,
+    onMessage: (message: ReviewMessageDTO) => void,
+    signal?: AbortSignal,
+  ): Promise<DisputeReviewResult>;
   /** AG Grid AI Toolkit: question + schema + state -> new grid state. */
   gridQuery(request: GridQueryRequestDTO): Promise<GridQueryResponseDTO>;
   /** POST /api/ai/chat for the AG Studio adapter (non-streaming). */
@@ -452,6 +656,17 @@ function stubPaypal(mode: PaypalMode): PaypalClient {
     voidAuthorization: missing("paypal.voidAuthorization"),
     createPayoutBatch: missing("paypal.createPayoutBatch"),
     getPayoutBatch: missing("paypal.getPayoutBatch"),
+    listDisputes: missing("paypal.listDisputes"),
+    getDispute: missing("paypal.getDispute"),
+    provideDisputeEvidence: missing("paypal.provideDisputeEvidence"),
+    sendDisputeMessage: missing("paypal.sendDisputeMessage"),
+    makeDisputeOffer: missing("paypal.makeDisputeOffer"),
+    acceptDisputeClaim: missing("paypal.acceptDisputeClaim"),
+    escalateDispute: missing("paypal.escalateDispute"),
+    adjudicateDispute: missing("paypal.adjudicateDispute"),
+    requireDisputeEvidence: missing("paypal.requireDisputeEvidence"),
+    refundCapture: missing("paypal.refundCapture"),
+    createInvoiceRecord: missing("paypal.createInvoiceRecord"),
   };
 }
 
@@ -480,6 +695,7 @@ function stubAi(llm: LlmConfig): AiService {
     },
     parsePolicy: missing("ai.parsePolicy"),
     reviewSpend: missing("ai.reviewSpend"),
+    reviewDispute: missing("ai.reviewDispute"),
     gridQuery: missing("ai.gridQuery"),
     chatProxy: missing("ai.chatProxy"),
   };

@@ -11,5 +11,7 @@ export { parsePolicyText } from "./policy/regex";
 export { draftToPolicy, type PolicyDraft } from "./policy/draft";
 export { summarizePolicy } from "./policy/summary";
 export { REVIEW_BUDGET_MS } from "./review/review";
+export { runDisputeJury } from "./dispute/jury";
+export { ruleBasedJury } from "./dispute/rules";
 export { ESCALATE_BELOW } from "./review/decision";
 export { type GridSchemaSummary, summarizeGridSchema } from "./grid/schema";

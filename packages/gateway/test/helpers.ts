@@ -274,6 +274,13 @@ export function fakeAi(): FakeAi {
         ...decided,
       };
     },
+    async reviewDispute(input, onMessage) {
+      const at = Date.now();
+      onMessage({ role: "prosecutor", content: `The buyer disputes ${input.amountCents} cents.`, at });
+      onMessage({ role: "defender", content: `${input.signatures.verified} of ${input.signatures.billedCalls} calls are signed.`, at });
+      onMessage({ role: "judge", content: "Contest the dispute.", at });
+      return { recommendation: "contest", refundCents: 0, confidence: 0.9, reason: "Signed calls.", draft: "The buyer's agents signed every call.", transcript: [], model: "fake-gemma" };
+    },
     async gridQuery(request) {
       return { state: { ...request.state, filter: { q: request.question } }, explanation: "filtered", model: "fake-gemma" };
     },

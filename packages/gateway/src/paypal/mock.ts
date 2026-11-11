@@ -6,6 +6,11 @@
  * State is persisted as JSON rows in `kv` under `mockpaypal:` because tabs in SQLite reference mock order
  * and authorization ids across gateway restarts. `PayPal-Request-Id` is honored: repeating a request id
  * returns the first successful response (failures are not cached, so they can be retried).
+ *
+ * Disputes follow PayPal's lifecycle on the demo clock: the buyer opens one on a capture (`openMockDispute`,
+ * the stand-in for PayPal's Resolution Center) as an INQUIRY waiting for the seller, who has 10 days to respond
+ * before it resolves in the buyer's favour. Evidence puts it UNDER_REVIEW; an offer is accepted by the mock
+ * buyer at once; accepting the claim or adjudicating settles it. Refunds and invoices are recorded too.
  */
 import { randomBytes } from "node:crypto";
 import { captureFeeCents, PAYPAL_US_FEES } from "@p402/shared";
@@ -17,12 +22,15 @@ import type {
   PaypalAuthorization,
   PaypalCapture,
   PaypalClient,
+  PaypalDispute,
+  PaypalDisputeSummary,
+  PaypalInvoice,
   PaypalOrder,
   PaypalPayoutBatch,
   PaypalPayoutItem,
 } from "../context";
 import { DAY_MS } from "../clock";
-import { kvGet, kvSet, parseJson, tx } from "../db/db";
+import { kvGet, kvSet, parseJson, stmt, tx } from "../db/db";
 import { PaypalError } from "./errors";
 
 const PREFIX = "mockpaypal:";
@@ -77,6 +85,8 @@ interface MockCapture {
   finalCapture: boolean;
   invoiceId: string | null;
   createdAt: number;
+  /** Given back to the payer by refunds and disputes (absent on records from older builds). */
+  refundedCents?: number;
 }
 
 interface MockBatch {
@@ -98,7 +108,7 @@ export interface MockPaypalDeps {
 const ID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 /** Plausible-looking mock ids, e.g. MOCK-ORDER-7KQ2M9XW4HTR. */
-export function mockId(kind: "ORDER" | "AUTH" | "CAPTURE" | "BATCH" | "ITEM"): string {
+export function mockId(kind: "ORDER" | "AUTH" | "CAPTURE" | "BATCH" | "ITEM" | "D" | "REFUND" | "INV"): string {
   let out = "";
   for (const byte of randomBytes(12)) out += ID_ALPHABET[byte % ID_ALPHABET.length];
   return `MOCK-${kind}-${out}`;
@@ -178,6 +188,7 @@ export function createMockPaypal(deps: MockPaypalDeps): PaypalClient {
     id: order.id,
     status: order.status,
     approveUrl: order.status === "PAYER_ACTION_REQUIRED" ? mockApproveUrl(deps.config.publicBaseUrl, order.id) : null,
+    ...(order.status === "PAYER_ACTION_REQUIRED" ? {} : { payerEmail: MOCK_PAYER_EMAIL }),
   });
 
   /** Expiry is evaluated lazily, like PayPal reporting EXPIRED once the 29 days are over. */
@@ -433,7 +444,287 @@ export function createMockPaypal(deps: MockPaypalDeps): PaypalClient {
       const batch = load<MockBatch>(db, "batch", batchId) ?? notFound("get payout batch", `payout batch ${batchId}`);
       return batchView(batch);
     },
+
+    // ------------------------------------------------------------ disputes
+
+    async listDisputes(input = {}) {
+      return tx(db, () =>
+        allMockDisputes(db)
+          .map((d) => aged(db, d, now()))
+          .filter((d) => input.updatedAfter == null || d.updatedAt > input.updatedAfter)
+          .filter((d) => !input.disputedTransactionId || d.captureId === input.disputedTransactionId)
+          .sort((a, b) => b.createdAt - a.createdAt || (a.id < b.id ? 1 : -1))
+          .map(disputeSummary),
+      );
+    },
+
+    async getDispute(disputeId) {
+      return tx(db, () => disputeView(aged(db, requireDispute("get dispute", disputeId), now())));
+    },
+
+    async provideDisputeEvidence(disputeId, input) {
+      const operation = "provide dispute evidence";
+      changeDispute(operation, disputeId, (d, at) => {
+        if (d.status !== "WAITING_FOR_SELLER_RESPONSE") {
+          unprocessable(operation, "NOT_ALLOWED_TO_PROVIDE_EVIDENCE", `Evidence is accepted only while PayPal waits for the seller (the dispute is ${d.status}).`);
+        }
+        if (!input.notes.trim()) unprocessable(operation, "MISSING_EVIDENCE", "Evidence needs notes or documents.");
+        d.evidences.push({ type: input.evidenceType ?? "OTHER", notes: input.notes.slice(0, 2_000), at });
+        d.status = "UNDER_REVIEW";
+        d.sellerResponseDueAt = null;
+      });
+    },
+
+    async sendDisputeMessage(disputeId, message) {
+      const operation = "send dispute message";
+      changeDispute(operation, disputeId, (d, at) => {
+        if (d.stage !== "INQUIRY") unprocessable(operation, "NOT_AN_INQUIRY", "Messages can be sent only while the dispute is an inquiry.");
+        if (!message.trim()) unprocessable(operation, "MISSING_MESSAGE", "The message is empty.");
+        d.messages.push({ postedBy: "SELLER", content: message.slice(0, 2_000), at });
+        d.status = "WAITING_FOR_BUYER_RESPONSE";
+        d.sellerResponseDueAt = null;
+      });
+    },
+
+    async makeDisputeOffer(disputeId, input) {
+      const operation = "make dispute offer";
+      changeDispute(operation, disputeId, (d, at) => {
+        if (d.stage !== "INQUIRY") unprocessable(operation, "NOT_AN_INQUIRY", "Offers can be made only while the dispute is an inquiry.");
+        if (!Number.isSafeInteger(input.amountCents) || input.amountCents <= 0 || input.amountCents > d.amountCents) {
+          unprocessable(operation, "INVALID_OFFER_AMOUNT", "The offer must be between $0.01 and the disputed amount.");
+        }
+        d.offer = { amountCents: input.amountCents, note: input.note.slice(0, 2_000), at };
+        // The mock buyer takes any refund offered, at once.
+        d.messages.push({ postedBy: "BUYER", content: "I accept the refund offered.", at });
+        resolveDispute(db, d, at, "RESOLVED_BUYER_FAVOUR", input.amountCents);
+      });
+    },
+
+    async acceptDisputeClaim(disputeId, input) {
+      const operation = "accept dispute claim";
+      changeDispute(operation, disputeId, (d, at) => {
+        const refund = input.refundCents ?? d.amountCents;
+        if (!Number.isSafeInteger(refund) || refund <= 0 || refund > d.amountCents) {
+          unprocessable(operation, "INVALID_REFUND_AMOUNT", "The refund must be between $0.01 and the disputed amount.");
+        }
+        if (input.note.trim()) d.messages.push({ postedBy: "SELLER", content: input.note.slice(0, 2_000), at });
+        resolveDispute(db, d, at, "RESOLVED_BUYER_FAVOUR", refund);
+      });
+    },
+
+    async escalateDispute(disputeId, note) {
+      const operation = "escalate dispute";
+      changeDispute(operation, disputeId, (d, at) => {
+        if (d.stage !== "INQUIRY") unprocessable(operation, "NOT_AN_INQUIRY", "Only an inquiry can be escalated to a claim.");
+        if (note.trim()) d.messages.push({ postedBy: "SELLER", content: note.slice(0, 2_000), at });
+        d.stage = "CHARGEBACK";
+        d.status = "UNDER_REVIEW";
+        d.sellerResponseDueAt = null;
+      });
+    },
+
+    async adjudicateDispute(disputeId, outcome) {
+      // PayPal's sandbox settles only disputes UNDER_REVIEW; the offline demo settles any open one.
+      changeDispute("adjudicate dispute", disputeId, (d, at) => {
+        if (outcome === "BUYER_FAVOR") resolveDispute(db, d, at, "RESOLVED_BUYER_FAVOUR", d.amountCents);
+        else resolveDispute(db, d, at, "RESOLVED_SELLER_FAVOUR", 0);
+      });
+    },
+
+    async requireDisputeEvidence(disputeId, action) {
+      const operation = "require dispute evidence";
+      changeDispute(operation, disputeId, (d, at) => {
+        if (d.status !== "UNDER_REVIEW") unprocessable(operation, "NOT_UNDER_REVIEW", "Only a dispute under review can ask for evidence.");
+        d.status = action === "SELLER_EVIDENCE" ? "WAITING_FOR_SELLER_RESPONSE" : "WAITING_FOR_BUYER_RESPONSE";
+        d.sellerResponseDueAt = action === "SELLER_EVIDENCE" ? at + SELLER_RESPONSE_DAYS * DAY_MS : null;
+      });
+    },
+
+    // ------------------------------------------------------------ refunds & invoices
+
+    async refundCapture(captureId, input) {
+      const operation = "refund capture";
+      return mutate(operation, input.requestId, () => {
+        const capture = load<MockCapture>(db, "capture", captureId) ?? notFound(operation, `capture ${captureId}`);
+        const left = capture.amountCents - (capture.refundedCents ?? 0);
+        const amount = input.amountCents ?? left;
+        if (!Number.isSafeInteger(amount) || amount <= 0) unprocessable(operation, "CANNOT_BE_ZERO_OR_NEGATIVE", "The refund must be at least $0.01.");
+        if (amount > left) unprocessable(operation, "REFUND_AMOUNT_EXCEEDED", "The refund exceeds what is left of the capture.");
+        save(db, "capture", capture.id, { ...capture, refundedCents: (capture.refundedCents ?? 0) + amount } satisfies MockCapture);
+        return { id: mockId("REFUND"), status: "COMPLETED", amountCents: amount };
+      });
+    },
+
+    async createInvoiceRecord(input) {
+      const operation = "create invoice record";
+      return tx(db, () => {
+        const existing = kvGet(db, keyOf("invoice-number", input.invoiceNumber));
+        if (existing) {
+          const stored = load<PaypalInvoice>(db, "inv", existing);
+          if (stored) return { id: stored.id, invoiceNumber: stored.invoiceNumber, status: stored.status, amountCents: stored.amountCents, url: stored.url };
+        }
+        if (!input.invoiceNumber || input.invoiceNumber.length > 25) unprocessable(operation, "INVALID_INVOICE_NUMBER", "Invoice numbers have 1 to 25 characters.");
+        if (!Number.isSafeInteger(input.amountCents) || input.amountCents <= 0) unprocessable(operation, "INVALID_AMOUNT", "The amount must be at least $0.01.");
+        const invoice: PaypalInvoice = {
+          id: mockId("INV"),
+          invoiceNumber: input.invoiceNumber,
+          status: "MARKED_AS_PAID",
+          amountCents: input.amountCents,
+          url: null,
+        };
+        save(db, "inv", invoice.id, { ...invoice, recipientEmail: input.recipientEmail, itemDescription: input.itemDescription, createdAt: now() });
+        kvSet(db, keyOf("invoice-number", input.invoiceNumber), invoice.id);
+        return invoice;
+      });
+    },
   };
+
+  function requireDispute(operation: string, disputeId: string): MockDispute {
+    return load<MockDispute>(db, "dispute", disputeId) ?? notFound(operation, `dispute ${disputeId}`);
+  }
+
+  /** Age the dispute on the demo clock, refuse changes to a resolved one, apply `change`, save. */
+  function changeDispute(operation: string, disputeId: string, change: (d: MockDispute, at: number) => void): void {
+    tx(db, () => {
+      const at = now();
+      const d = aged(db, requireDispute(operation, disputeId), at);
+      if (d.status === "RESOLVED") unprocessable(operation, "DISPUTE_ALREADY_RESOLVED", "The dispute is already resolved.");
+      change(d, at);
+      d.updatedAt = at;
+      save(db, "dispute", d.id, d);
+    });
+  }
+}
+
+// ---------------------------------------------------------------- mock disputes
+
+/** The mock buyer's PayPal account (shown as the payer of approved mock orders). */
+export const MOCK_PAYER_EMAIL = "northwind.buyer@personal.example.com";
+/** PayPal gives the seller 10 days to answer before the dispute closes in the buyer's favour. */
+export const SELLER_RESPONSE_DAYS = 10;
+
+export interface MockDispute {
+  id: string;
+  captureId: string;
+  reason: string;
+  status: string;
+  stage: string;
+  amountCents: number;
+  outcome: string | null;
+  refundedCents: number;
+  messages: Array<{ postedBy: "BUYER" | "SELLER" | "ARBITER"; content: string; at: number }>;
+  evidences: Array<{ type: string; notes: string; at: number }>;
+  offer: { amountCents: number; note: string; at: number } | null;
+  sellerResponseDueAt: number | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+function allMockDisputes(db: Db): MockDispute[] {
+  const rows = stmt(db, "SELECT value FROM kv WHERE key LIKE ? ORDER BY key").all(`${PREFIX}dispute:%`) as Array<{ value: string }>;
+  return rows.map((r) => parseJson<MockDispute | null>(r.value, null)).filter((d): d is MockDispute => d !== null);
+}
+
+function resolveDispute(db: Db, d: MockDispute, at: number, outcome: string, refundCents: number): void {
+  d.status = "RESOLVED";
+  d.outcome = outcome;
+  d.refundedCents = refundCents;
+  d.sellerResponseDueAt = null;
+  d.updatedAt = at;
+  if (refundCents > 0) {
+    const capture = load<MockCapture>(db, "capture", d.captureId);
+    if (capture) save(db, "capture", capture.id, { ...capture, refundedCents: (capture.refundedCents ?? 0) + refundCents } satisfies MockCapture);
+  }
+}
+
+/** A seller who never answers loses: past the response deadline the dispute resolves in the buyer's favour. */
+function aged(db: Db, d: MockDispute, at: number): MockDispute {
+  if (d.status === "WAITING_FOR_SELLER_RESPONSE" && d.sellerResponseDueAt != null && at >= d.sellerResponseDueAt) {
+    d.messages.push({ postedBy: "ARBITER", content: "The seller did not respond in time; the case closed in the buyer's favour.", at: d.sellerResponseDueAt });
+    resolveDispute(db, d, d.sellerResponseDueAt, "RESOLVED_BUYER_FAVOUR", d.amountCents);
+    save(db, "dispute", d.id, d);
+  }
+  return d;
+}
+
+function disputeSummary(d: MockDispute): PaypalDisputeSummary {
+  return { id: d.id, status: d.status, reason: d.reason, stage: d.stage, amountCents: d.amountCents, createdAt: d.createdAt, updatedAt: d.updatedAt };
+}
+
+/** What PayPal would offer the seller as HATEOAS links in this state. */
+function allowedActions(d: MockDispute): string[] {
+  if (d.status === "RESOLVED") return [];
+  const actions: string[] = ["accept_claim"];
+  if (d.status === "WAITING_FOR_SELLER_RESPONSE") actions.push("provide_evidence");
+  if (d.stage === "INQUIRY") actions.push("send_message", "make_offer", "escalate");
+  if (d.status === "UNDER_REVIEW") actions.push("adjudicate", "require_evidence");
+  return actions;
+}
+
+function disputeView(d: MockDispute): PaypalDispute {
+  const buyer = d.messages.filter((m) => m.postedBy === "BUYER").at(-1);
+  return {
+    ...disputeSummary(d),
+    captureIds: [d.captureId],
+    outcome: d.outcome,
+    refundedCents: d.status === "RESOLVED" ? d.refundedCents : null,
+    buyerMessage: buyer?.content ?? null,
+    sellerResponseDueAt: d.sellerResponseDueAt,
+    actions: allowedActions(d),
+  };
+}
+
+export interface MockDisputeInput {
+  captureId: string;
+  reason?: string;
+  message?: string;
+  amountCents?: number;
+}
+
+/**
+ * The buyer opens a dispute on a capture, as PayPal's Resolution Center would (mock mode only). Defaults: the
+ * whole capture, reason MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED. Throws when the capture is unknown or the
+ * amount is more than what is left of it.
+ */
+export function openMockDispute(deps: { db: Db; clock?: Pick<Clock, "now"> }, input: MockDisputeInput): PaypalDispute {
+  const { db } = deps;
+  const at = deps.clock?.now() ?? Date.now();
+  return tx(db, () => {
+    const capture = load<MockCapture>(db, "capture", input.captureId);
+    if (!capture) throw new PaypalError({ operation: "open dispute", paypalName: "RESOURCE_NOT_FOUND", message: `No mock capture ${input.captureId}.`, httpStatus: 404 });
+    const refuse = (description: string): never => {
+      throw new PaypalError({ operation: "open dispute", paypalName: "UNPROCESSABLE_ENTITY", message: description, issues: [{ issue: "DISPUTE_NOT_ALLOWED", description }], httpStatus: 422 });
+    };
+    const open = allMockDisputes(db).filter((d) => d.captureId === capture.id && d.status !== "RESOLVED");
+    if (open.length > 0) refuse(`The buyer already has dispute ${open[0]?.id} open on this charge.`);
+    const left = capture.amountCents - (capture.refundedCents ?? 0);
+    const amount = input.amountCents ?? left;
+    if (left <= 0) refuse("This charge was already refunded in full, so there is nothing left to dispute.");
+    if (!Number.isSafeInteger(amount) || amount <= 0 || amount > left) refuse(`A dispute can claim 1 to ${left} cents: what is left of this charge.`);
+    const d: MockDispute = {
+      id: mockId("D"),
+      captureId: capture.id,
+      reason: input.reason ?? "MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED",
+      status: "WAITING_FOR_SELLER_RESPONSE",
+      stage: "INQUIRY",
+      amountCents: amount,
+      outcome: null,
+      refundedCents: 0,
+      messages: input.message?.trim() ? [{ postedBy: "BUYER", content: input.message.trim().slice(0, 2_000), at }] : [],
+      evidences: [],
+      offer: null,
+      sellerResponseDueAt: at + SELLER_RESPONSE_DAYS * DAY_MS,
+      createdAt: at,
+      updatedAt: at,
+    };
+    save(db, "dispute", d.id, d);
+    return disputeView(d);
+  });
+}
+
+/** What a mock dispute looks like inside (tests). */
+export function inspectMockDispute(db: Db, disputeId: string): Readonly<MockDispute> | null {
+  return load<MockDispute>(db, "dispute", disputeId);
 }
 
 function batchView(batch: MockBatch): PaypalPayoutBatch {
