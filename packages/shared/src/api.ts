@@ -63,6 +63,8 @@ export interface SellerDTO {
   gatewayUrl: string;
   balanceMicros: Micros;
   paidOutMicros: Micros;
+  /** Earnings from charges under an open PayPal dispute, held back from payouts until it resolves. */
+  heldMicros?: Micros;
   createdAt: number;
   stats: SellerStatsDTO;
 }
@@ -300,7 +302,117 @@ export interface StatementDTO {
   sellers: SettlementLineDTO[];
   voids: { count: number; micros: Micros; byReason: Record<string, number> };
   fees: { paypalFeeCents: number; effectiveRatePct: number; naiveFeeCents: number; savedCents: number };
+  /** The PayPal invoice recorded as paid for this tab's charge (PAYPAL_INVOICE_RECORDS=1). */
+  invoice?: InvoiceDTO | null;
+  /** PayPal disputes opened on this tab's charge, newest first. */
+  disputes?: DisputeDTO[];
   generatedAt: number;
+}
+
+// ---------------------------------------------------------------- disputes & invoices (PayPal Disputes + Invoicing APIs)
+
+/** PayPal's dispute status (Disputes API v1). */
+export type DisputeStatus = "OPEN" | "WAITING_FOR_BUYER_RESPONSE" | "WAITING_FOR_SELLER_RESPONSE" | "UNDER_REVIEW" | "RESOLVED" | "OTHER";
+
+/** What the AI jury recommends for a dispute on a tab's charge. */
+export type DisputeRecommendation = "contest" | "partial_refund" | "accept";
+
+/**
+ * The AI jury's hearing of a dispute: the prosecutor argues the buyer's claim, the defender argues the charge stands
+ * on the signed IOU ledger, and the judge recommends a response for a human to send.
+ */
+export interface DisputeJuryDTO {
+  status: "running" | "done" | "failed";
+  recommendation?: DisputeRecommendation | null;
+  /** Refund the judge suggests for partial_refund or accept, in cents. */
+  refundCents?: number | null;
+  confidence?: number | null;
+  reason?: string | null;
+  /** The response drafted for PayPal (evidence notes or the offer/acceptance note). */
+  draft?: string | null;
+  transcript: ReviewMessageDTO[];
+  model?: string | null;
+  createdAt: number;
+  finishedAt?: number | null;
+}
+
+/** sandbox_adjudicate exists only in PayPal's sandbox (and the mock): it settles the dispute for the demo. */
+export type DisputeActionKind = "send_evidence" | "make_offer" | "accept_claim" | "sandbox_adjudicate";
+
+export interface DisputeActionDTO {
+  kind: DisputeActionKind;
+  at: number;
+  amountCents?: number | null;
+  note?: string | null;
+  ok: boolean;
+  error?: string | null;
+}
+
+export interface DisputeDTO {
+  /** PayPal dispute id (PP-D-…), or MOCK-D-… in mock mode. */
+  id: string;
+  settlementId: string | null;
+  tabId: string | null;
+  companyId: string | null;
+  /** The disputed PayPal capture (the tab's one charge). */
+  captureId: string | null;
+  status: DisputeStatus;
+  /** PayPal's reason code, e.g. MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED or UNAUTHORISED. */
+  reason: string;
+  /** INQUIRY, CHARGEBACK, PRE_ARBITRATION or ARBITRATION. */
+  stage: string | null;
+  amountCents: number;
+  /** PayPal's outcome code once resolved, e.g. RESOLVED_BUYER_FAVOUR or RESOLVED_SELLER_FAVOUR. */
+  outcome: string | null;
+  /** Refunded to the buyer through this dispute; deducted from the tab's sellers pro rata. */
+  refundedCents: number;
+  buyerMessage: string | null;
+  sellerResponseDueAt: number | null;
+  /** Seller earnings from the disputed charge held back from payouts while the dispute is open. */
+  heldMicros: Micros;
+  jury: DisputeJuryDTO | null;
+  actions: DisputeActionDTO[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface DisputeSyncResultDTO {
+  checked: number;
+  created: number;
+  updated: number;
+}
+
+export interface DisputeActionRequestDTO {
+  kind: Exclude<DisputeActionKind, "sandbox_adjudicate">;
+  note?: string;
+  /** make_offer: the refund offered; accept_claim: a partial refund (omit for the full amount). */
+  amountCents?: number;
+}
+
+/** Sandbox and mock only: settle a dispute for the demo. */
+export interface DisputeAdjudicateDTO {
+  outcome: "buyer" | "seller";
+}
+
+/** Mock mode only: simulate the buyer opening a dispute on a settled tab's charge. */
+export interface MockDisputeCreateDTO {
+  settlementId: string;
+  reason?: string;
+  message?: string;
+  amountCents?: number;
+}
+
+export interface InvoiceDTO {
+  /** PayPal invoice id (INV2-…), or MOCK-INV-… in mock mode. */
+  id: string;
+  settlementId: string;
+  invoiceNumber: string;
+  /** PayPal's invoice status, e.g. PAID or MARKED_AS_PAID. */
+  status: string;
+  amountCents: number;
+  /** PayPal's payer view of the invoice, when PayPal returns one. */
+  url: string | null;
+  createdAt: number;
 }
 
 // ---------------------------------------------------------------- agent runs & purchases

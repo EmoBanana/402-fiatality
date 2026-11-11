@@ -4,6 +4,7 @@ import type {
   AgentStepDTO,
   AlarmDTO,
   ClockDTO,
+  DisputeDTO,
   MetricsSummaryDTO,
   PayoutDTO,
   PurchaseDTO,
@@ -30,6 +31,8 @@ export type GatewayEvent =
   | { type: "agent.finished"; at: number; data: AgentRunDTO }
   | { type: "purchase.updated"; at: number; data: PurchaseDTO }
   | { type: "clock.advanced"; at: number; data: ClockDTO }
+  | { type: "dispute.updated"; at: number; data: DisputeDTO }
+  | { type: "dispute.message"; at: number; data: { disputeId: string; message: ReviewMessageDTO } }
   | { type: "metrics"; at: number; data: MetricsSummaryDTO };
 
 export type GatewayEventType = GatewayEvent["type"];
