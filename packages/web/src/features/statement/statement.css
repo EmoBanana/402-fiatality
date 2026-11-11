@@ -101,6 +101,48 @@
   letter-spacing: -0.04em;
 }
 
+.st-invoice {
+  margin-top: 6px;
+  font-size: var(--text-13);
+  color: var(--ink-2);
+}
+
+.st-invoice .ui-money {
+  color: var(--ink);
+}
+
+.st-invoice-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+  font-weight: var(--weight-medium);
+}
+
+.st-dispute {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--ink);
+}
+
+.st-dispute small {
+  font-size: var(--text-12);
+  color: var(--muted);
+}
+
+.st-dispute small .mono {
+  font-size: 11px;
+}
+
+.st-case-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
 .st-columns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

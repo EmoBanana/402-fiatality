@@ -1,9 +1,10 @@
 /**
  * Printable statement for one tab (SPEC §9.2): the one PayPal charge, what was billable, carried and voided,
- * fees against per-call payments, the per-seller split and the PayPal references. Prints black on white
- * without the app chrome (statement.css + base.css print rules).
+ * fees against per-call payments, the per-seller split, PayPal disputes on the charge (with the AI jury's
+ * recommendation) and the PayPal references, including the invoice recorded for the charge. Prints black on
+ * white without the app chrome (statement.css + base.css print rules).
  */
-import type { StatementDTO } from "@p402/shared";
+import type { DisputeDTO, InvoiceDTO, StatementDTO } from "@p402/shared";
 import { useEffect } from "react";
 import { Link, useParams } from "react-router";
 import { TabStatusBadge } from "../components/Badge";
@@ -11,11 +12,12 @@ import { Button, buttonClassName } from "../components/Button";
 import { Callout } from "../components/Callout";
 import { EmptyState } from "../components/EmptyState";
 import { ErrorState } from "../components/ErrorState";
-import { IconArrowLeft } from "../components/Icons";
+import { IconArrowLeft, IconArrowRight, IconExternal } from "../components/Icons";
 import { Logo } from "../components/Logo";
 import { Money } from "../components/Money";
 import { Skeleton, SkeletonText } from "../components/Skeleton";
 import { Table } from "../components/Table";
+import { confidencePct, disputeBadge, disputeReasonLabel, RECOMMENDATION, sentenceCase } from "../features/jury/docket";
 import "../features/statement/statement.css";
 import { ApiError, api } from "../lib/api";
 import { formatCount, formatDate, formatDateTime, formatPct, formatUsd, plural, voidReasonLabel } from "../lib/format";
@@ -29,6 +31,89 @@ function Period({ statement }: { statement: StatementDTO }) {
     <>
       {formatDate(start)} to {formatDate(end)}
     </>
+  );
+}
+
+const INVOICE_STATUS: Record<string, string> = {
+  PAID: "Paid",
+  MARKED_AS_PAID: "Marked as paid",
+  PARTIALLY_PAID: "Partly paid",
+  SENT: "Sent",
+  DRAFT: "Draft",
+  REFUNDED: "Refunded",
+  PARTIALLY_REFUNDED: "Partly refunded",
+  MARKED_AS_REFUNDED: "Marked as refunded",
+  CANCELLED: "Cancelled",
+};
+
+function invoiceStatus(status: string): string {
+  return INVOICE_STATUS[status.toUpperCase()] ?? sentenceCase(status);
+}
+
+function Invoice({ invoice }: { invoice: InvoiceDTO }) {
+  return (
+    <p className="st-invoice">
+      PayPal invoice <span className="mono">{invoice.invoiceNumber}</span> · {invoiceStatus(invoice.status)} · <Money cents={invoice.amountCents} />
+      {invoice.url ? (
+        <>
+          {" "}
+          <a href={invoice.url} target="_blank" rel="noopener noreferrer" className="st-invoice-link ui-no-print">
+            View on PayPal <IconExternal size={12} />
+          </a>
+        </>
+      ) : null}
+    </p>
+  );
+}
+
+function juryLine(dispute: DisputeDTO): string {
+  const jury = dispute.jury;
+  if (!jury) return "Not heard yet";
+  if (jury.status === "running") return "Hearing now";
+  if (!jury.recommendation) return "No recommendation";
+  const pct = confidencePct(jury.confidence);
+  return `${RECOMMENDATION[jury.recommendation].label}${pct != null ? ` · ${pct}%` : ""}`;
+}
+
+function Disputes({ disputes }: { disputes: DisputeDTO[] }) {
+  const refunded = disputes.reduce((sum, d) => sum + d.refundedCents, 0);
+  return (
+    <section aria-labelledby="st-disputes" className="st-section">
+      <h2 id="st-disputes">Disputes</h2>
+      <Table
+        caption="PayPal disputes on this charge"
+        rows={disputes}
+        rowKey={(d) => d.id}
+        columns={[
+          {
+            key: "dispute",
+            header: "Dispute",
+            render: (d) => (
+              <span className="st-dispute">
+                {disputeReasonLabel(d.reason)}
+                <small>
+                  <span className="mono">{d.id}</span> · opened {formatDate(d.createdAt)}
+                </small>
+              </span>
+            ),
+          },
+          { key: "status", header: "Status", render: (d) => disputeBadge(d).label },
+          { key: "jury", header: "AI jury", render: (d) => juryLine(d) },
+          { key: "amount", header: "Disputed", align: "right", render: (d) => <Money cents={d.amountCents} padTo={2} /> },
+          {
+            key: "case",
+            header: <span className="visually-hidden">Case</span>,
+            align: "right",
+            render: (d) => (
+              <Link to={`/jury#${encodeURIComponent(d.id)}`} className="st-case-link ui-no-print" aria-label={`Open the jury's case on dispute ${d.id}`}>
+                Case <IconArrowRight size={12} />
+              </Link>
+            ),
+          },
+        ]}
+        footer={refunded > 0 ? { dispute: "Refunded to you through disputes", amount: <Money cents={refunded} padTo={2} /> } : undefined}
+      />
+    </section>
   );
 }
 
@@ -94,6 +179,7 @@ function StatementBody({ statement }: { statement: StatementDTO }) {
             </>
           ) : null}
         </p>
+        {statement.invoice ? <Invoice invoice={statement.invoice} /> : null}
       </section>
 
       <div className="st-columns">
@@ -174,6 +260,8 @@ function StatementBody({ statement }: { statement: StatementDTO }) {
         />
       </section>
 
+      {statement.disputes?.length ? <Disputes disputes={statement.disputes} /> : null}
+
       <div className="st-columns st-section">
         <section aria-labelledby="st-voids">
           <h2 id="st-voids">Voided calls</h2>
@@ -219,6 +307,12 @@ function StatementBody({ statement }: { statement: StatementDTO }) {
               <div>
                 <dt>Settlement</dt>
                 <dd className="mono">{settlement.id}</dd>
+              </div>
+            ) : null}
+            {statement.invoice ? (
+              <div>
+                <dt>Invoice</dt>
+                <dd className="mono">{statement.invoice.id}</dd>
               </div>
             ) : null}
           </dl>
