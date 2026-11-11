@@ -10,7 +10,7 @@
 
 .sl-stats > .ui-card-body {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: var(--space-3);
 }
 
@@ -120,6 +120,20 @@
   font-family: var(--font-sans);
   font-size: var(--text-12);
   color: var(--muted);
+}
+
+.sl-held {
+  margin: 0 var(--space-3) var(--space-2);
+  padding: 10px 12px;
+  border-radius: var(--radius-input);
+  background: color-mix(in srgb, var(--warning-soft) 80%, var(--surface));
+  font-size: var(--text-12);
+  color: var(--ink-2);
+}
+
+.sl-held .ui-money {
+  color: var(--ink);
+  font-weight: var(--weight-medium);
 }
 
 .sl-void-high {
@@ -298,11 +312,12 @@
   gap: 14px var(--space-2);
 }
 
+/* Five figures: owed, paid out and held on the first row, activity on the second. */
 @media (max-width: 1100px) {
   .sl-stats > .ui-card-body {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  .sl-stats .ui-stat:nth-child(3) {
+  .sl-stats .ui-stat:nth-child(4) {
     padding-left: 0;
     border-left: 0;
   }

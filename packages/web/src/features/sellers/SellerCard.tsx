@@ -1,9 +1,11 @@
 /**
  * One listed API: what each endpoint costs, what the seller is owed and has been paid, how often calls were
- * voided, and the rules that decide it. Pause/resume takes the listing off the paywall.
+ * voided, and the rules that decide it. Earnings held back while a PayPal dispute is open show under the
+ * figures. Pause/resume takes the listing off the paywall.
  */
 import type { SellerDTO } from "@p402/shared";
 import { useState } from "react";
+import { Link } from "react-router";
 import { SellerStatusBadge } from "../../components/Badge";
 import { Button } from "../../components/Button";
 import { CopyButton } from "../../components/CopyButton";
@@ -38,7 +40,9 @@ export function SellerCard({ seller, thresholdCents, onUpdate }: { seller: Selle
   const [busy, setBusy] = useState(false);
   const { calls, voids } = seller.stats;
   const voidRate = calls ? (voids / calls) * 100 : 0;
-  const due = seller.balanceMicros >= thresholdCents * 10_000;
+  const held = seller.heldMicros ?? 0;
+  // Held earnings stay out of payouts until the dispute resolves.
+  const due = seller.balanceMicros - held >= thresholdCents * 10_000;
 
   async function toggle() {
     setBusy(true);
@@ -102,6 +106,13 @@ export function SellerCard({ seller, thresholdCents, onUpdate }: { seller: Selle
           <dd className="sl-figure-hint">{calls ? `${formatCount(voids)} of ${formatCount(calls)} calls` : "No paid calls yet"}</dd>
         </div>
       </dl>
+
+      {held > 0 ? (
+        <p className="sl-held">
+          <Money micros={held} /> held from payouts while a PayPal dispute on one of its charges is open.{" "}
+          <Link to="/jury?show=disputes">See the dispute</Link>
+        </p>
+      ) : null}
 
       <div className="sl-card-foot">
         <p className="sl-rules-text">

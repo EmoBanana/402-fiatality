@@ -1,11 +1,12 @@
 /**
  * Seller portal (SPEC §9.2): every listed API with its prices, balance, payouts and void rate; "List your
- * API"; weekly PayPal payouts and their history. Kept live from `seller.updated` and `payout.completed`.
- * `/sellers?new=1` opens the listing form directly (the landing page links there).
+ * API"; weekly PayPal payouts and their history. Earnings from a charge under an open PayPal dispute are held
+ * back from payouts until it resolves ("Held for disputes"). Kept live from `seller.updated` and
+ * `payout.completed`. `/sellers?new=1` opens the listing form directly (the landing page links there).
  */
 import type { SellerDTO } from "@p402/shared";
 import { useState } from "react";
-import { useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { Drawer } from "../components/Drawer";
@@ -54,8 +55,10 @@ export default function Sellers() {
       calls: acc.calls + s.stats.calls,
       voids: acc.voids + s.stats.voids,
       gross: acc.gross + s.stats.grossMicros,
+      held: acc.held + (s.heldMicros ?? 0),
+      holding: acc.holding + ((s.heldMicros ?? 0) > 0 ? 1 : 0),
     }),
-    { owed: 0, paid: 0, calls: 0, voids: 0, gross: 0 },
+    { owed: 0, paid: 0, calls: 0, voids: 0, gross: 0, held: 0, holding: 0 },
   );
 
   return (
@@ -87,6 +90,20 @@ export default function Sellers() {
                   hint={totals.owed < 0 ? "Fee shares outweighed tiny tabs" : "Settled, not yet paid out"}
                 />
                 <Stat label="Paid out" value={<Money micros={totals.paid} />} hint="Through PayPal payouts" />
+                <Stat
+                  label="Held for disputes"
+                  value={<Money micros={totals.held} />}
+                  hint={
+                    totals.held > 0 ? (
+                      <>
+                        {totals.holding === 1 ? "1 seller" : `${formatCount(totals.holding)} sellers`} ·{" "}
+                        <Link to="/jury?show=disputes">see the disputes</Link>
+                      </>
+                    ) : (
+                      "Nothing held from payouts"
+                    )
+                  }
+                />
                 <Stat label="Earned from calls" value={<Money micros={totals.gross} />} hint={`${formatCount(totals.calls)} paid calls`} />
                 <Stat
                   label="Voided"
@@ -95,7 +112,7 @@ export default function Sellers() {
                 />
               </>
             ) : (
-              Array.from({ length: 4 }, (_, i) => (
+              Array.from({ length: 5 }, (_, i) => (
                 <div key={i} className="ui-stack" style={{ ["--stack-gap" as string]: "10px" }} aria-hidden="true">
                   <Skeleton width={90} height={12} />
                   <Skeleton width={120} height={22} />
