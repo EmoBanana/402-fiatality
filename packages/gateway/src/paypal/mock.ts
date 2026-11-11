@@ -469,7 +469,12 @@ export function createMockPaypal(deps: MockPaypalDeps): PaypalClient {
           unprocessable(operation, "NOT_ALLOWED_TO_PROVIDE_EVIDENCE", `Evidence is accepted only while PayPal waits for the seller (the dispute is ${d.status}).`);
         }
         if (!input.notes.trim()) unprocessable(operation, "MISSING_EVIDENCE", "Evidence needs notes or documents.");
-        d.evidences.push({ type: input.evidenceType ?? "OTHER", notes: input.notes.slice(0, 2_000), at });
+        const type = input.evidenceType ?? "OTHER";
+        // Like the sandbox: once PayPal has asked for a type of evidence, it refuses the others.
+        if (d.requestedEvidence?.length && !d.requestedEvidence.includes(type)) {
+          unprocessable(operation, "EVIDENCE_TYPE_IS_NOT_ALLOWED", `PayPal asked for ${d.requestedEvidence.join(" or ")}, not ${type}.`);
+        }
+        d.evidences.push({ type, notes: input.notes.slice(0, 2_000), at });
         d.status = "UNDER_REVIEW";
         d.sellerResponseDueAt = null;
       });
@@ -614,6 +619,8 @@ export interface MockDispute {
   refundedCents: number;
   messages: Array<{ postedBy: "BUYER" | "SELLER" | "ARBITER"; content: string; at: number }>;
   evidences: Array<{ type: string; notes: string; at: number }>;
+  /** Evidence types PayPal asked the seller for; absent on disputes saved before PayPal's requests were modelled. */
+  requestedEvidence?: string[];
   offer: { amountCents: number; note: string; at: number } | null;
   sellerResponseDueAt: number | null;
   createdAt: number;
@@ -671,6 +678,7 @@ function disputeView(d: MockDispute): PaypalDispute {
     buyerMessage: buyer?.content ?? null,
     sellerResponseDueAt: d.sellerResponseDueAt,
     actions: allowedActions(d),
+    requestedEvidence: [...(d.requestedEvidence ?? [])],
   };
 }
 
@@ -712,6 +720,8 @@ export function openMockDispute(deps: { db: Db; clock?: Pick<Clock, "now"> }, in
       refundedCents: 0,
       messages: input.message?.trim() ? [{ postedBy: "BUYER", content: input.message.trim().slice(0, 2_000), at }] : [],
       evidences: [],
+      // The sandbox asks the seller for proof the service was delivered.
+      requestedEvidence: ["PROOF_OF_FULFILLMENT"],
       offer: null,
       sellerResponseDueAt: at + SELLER_RESPONSE_DAYS * DAY_MS,
       createdAt: at,

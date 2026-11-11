@@ -13,7 +13,7 @@ import { createTestContext, type AppConfig, type AppContext } from "../context";
 import { stmt } from "../db/db";
 import { sellerHeldMicros } from "../db/dto";
 import { createPaypalClient } from "../paypal";
-import { approveMockOrder } from "../paypal/mock";
+import { approveMockOrder, inspectMockDispute } from "../paypal/mock";
 import { buildServer } from "../server";
 import { createSettlementService } from "../settlement";
 import { recordInvoice } from "../settlement/invoices";
@@ -163,6 +163,8 @@ describe("disputes on a tab charge", () => {
     expect(sent.body.actions).toEqual([expect.objectContaining({ kind: "send_evidence", ok: true })]);
     expect(sent.body.actions[0]?.note).toMatch(/Signed IOUs: 2500 of 2500 billed calls/);
     expect(sent.body.actions[0]?.note?.length).toBeLessThanOrEqual(2_000);
+    // Sent as the type PayPal asked for (it refuses OTHER once it has requested proof of fulfillment).
+    expect(inspectMockDispute(h.ctx.db, heard.id)?.evidences.map((e) => e.type)).toEqual(["PROOF_OF_FULFILLMENT"]);
 
     const won = await call<DisputeDTO>(h, "POST", `/api/disputes/${heard.id}/adjudicate`, { outcome: "seller" });
     expect(won.body).toMatchObject({ status: "RESOLVED", outcome: "RESOLVED_SELLER_FAVOUR", refundedCents: 0, heldMicros: 0 });

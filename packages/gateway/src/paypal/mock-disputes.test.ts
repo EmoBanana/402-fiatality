@@ -56,14 +56,20 @@ describe("mock disputes", () => {
 
   it("puts evidence under review, then settles it in the seller's favour", async () => {
     const { ctx, paypal, capture } = await charged();
-    const { id } = openMockDispute(ctx, { captureId: capture.id });
-    await paypal.provideDisputeEvidence(id, { notes: "Every call was signed.", evidenceType: "OTHER" });
+    const { id, requestedEvidence } = openMockDispute(ctx, { captureId: capture.id });
+    // Like the sandbox, PayPal asks for proof the service was delivered and refuses other evidence types.
+    expect(requestedEvidence).toEqual(["PROOF_OF_FULFILLMENT"]);
+    await expect(paypal.provideDisputeEvidence(id, { notes: "Every call was signed.", evidenceType: "OTHER" })).rejects.toMatchObject({
+      httpStatus: 422,
+      issues: [expect.objectContaining({ issue: "EVIDENCE_TYPE_IS_NOT_ALLOWED" })],
+    });
+    await paypal.provideDisputeEvidence(id, { notes: "Every call was signed.", evidenceType: "PROOF_OF_FULFILLMENT" });
     expect(await paypal.getDispute(id)).toMatchObject({ status: "UNDER_REVIEW", actions: expect.arrayContaining(["adjudicate"]) });
     await expect(paypal.provideDisputeEvidence(id, { notes: "again" })).rejects.toMatchObject({ httpStatus: 422 });
     await paypal.adjudicateDispute(id, "SELLER_FAVOR");
     expect(await paypal.getDispute(id)).toMatchObject({ status: "RESOLVED", outcome: "RESOLVED_SELLER_FAVOUR", refundedCents: 0, actions: [] });
     await expect(paypal.adjudicateDispute(id, "BUYER_FAVOR")).rejects.toMatchObject({ httpStatus: 422 });
-    expect(inspectMockDispute(ctx.db, id)?.evidences).toEqual([{ type: "OTHER", notes: "Every call was signed.", at: T0 }]);
+    expect(inspectMockDispute(ctx.db, id)?.evidences).toEqual([{ type: "PROOF_OF_FULFILLMENT", notes: "Every call was signed.", at: T0 }]);
   });
 
   it("lets the mock buyer take an offer, and refunds partial claims", async () => {

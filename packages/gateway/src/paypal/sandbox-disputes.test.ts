@@ -72,6 +72,11 @@ const DETAILS = {
     { posted_by: "SELLER", time_posted: "2026-11-10T10:30:00.000Z", content: "Every call was signed." },
     { posted_by: "BUYER", time_posted: "2026-11-10T10:45:00.000Z", content: "Still not mine." },
   ],
+  // As the sandbox answers a not-received inquiry: the buyer's report, then PayPal's request to the seller.
+  evidences: [
+    { evidence_type: "CREATE", notes: "I did not approve this.", source: "SUBMITTED_BY_BUYER", date: "2026-11-10T10:00:00.000Z" },
+    { evidence_type: "PROOF_OF_FULFILLMENT", source: "REQUESTED_FROM_SELLER", date: "2026-11-10T10:05:00.000Z" },
+  ],
   seller_response_due_date: "2026-11-20T10:00:00.000Z",
   links: [
     { href: `${API}/v1/customer/disputes/PP-D-27803`, rel: "self", method: "GET" },
@@ -120,7 +125,9 @@ describe("sandbox Disputes v1", () => {
       buyerMessage: "Still not mine.",
       sellerResponseDueAt: Date.parse("2026-11-20T10:00:00.000Z"),
       actions: ["provide_evidence", "send_message", "accept_claim", "make_offer"],
+      requestedEvidence: ["PROOF_OF_FULFILLMENT"],
     });
+    expect(toDispute({ ...DETAILS, evidences: undefined })).toMatchObject({ requestedEvidence: [] });
   });
 
   it("reads what PayPal gave back to the buyer from the outcome, money movements or refunds", () => {

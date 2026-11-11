@@ -706,6 +706,11 @@ export function toDispute(raw: unknown): PaypalDispute | null {
     .map(recordOf)
     .filter((m) => m?.posted_by === "BUYER" && textOf(m.content))
     .sort((a, b) => (timeOf(a?.time_posted) ?? 0) - (timeOf(b?.time_posted) ?? 0));
+  const requestedEvidence = arrayOf(d.evidences)
+    .map(recordOf)
+    .filter((e) => e?.source === "REQUESTED_FROM_SELLER")
+    .map((e) => textOf(e?.evidence_type))
+    .filter((type): type is string => type !== null);
   return {
     ...summary,
     captureIds,
@@ -714,6 +719,7 @@ export function toDispute(raw: unknown): PaypalDispute | null {
     buyerMessage: textOf(buyerMessages.at(-1)?.content)?.slice(0, 2_000) ?? null,
     sellerResponseDueAt: timeOf(d.seller_response_due_date),
     actions: disputeActionsOf(d.links),
+    requestedEvidence,
   };
 }
 

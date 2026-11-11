@@ -320,9 +320,13 @@ export function createDisputeService(ctx: AppContext): DisputeService {
         if (!canEvidence && !canMessage) {
           throw conflict("evidence_not_accepted", `PayPal is not taking the seller's evidence on this dispute now (status ${row.status}).`);
         }
-        await attempt(disputeId, { kind: "send_evidence", amountCents: null, note: text }, () =>
-          canEvidence ? ctx.paypal.provideDisputeEvidence(disputeId, { notes: text, evidenceType: "OTHER" }) : ctx.paypal.sendDisputeMessage(disputeId, text),
-        );
+        await attempt(disputeId, { kind: "send_evidence", amountCents: null, note: text }, async () => {
+          if (!canEvidence) return ctx.paypal.sendDisputeMessage(disputeId, text);
+          // PayPal takes only the evidence type it asked the seller for (PROOF_OF_FULFILLMENT on a not-received
+          // inquiry), so read the case now; OTHER when it asked for nothing in particular.
+          const requested = await ctx.paypal.getDispute(disputeId).then((d) => d.requestedEvidence.at(-1), () => undefined);
+          return ctx.paypal.provideDisputeEvidence(disputeId, { notes: text, evidenceType: requested ?? "OTHER" });
+        });
       } else if (request.kind === "make_offer") {
         const amount = request.amountCents ?? (jury?.refundCents && jury.refundCents > 0 ? Math.min(jury.refundCents, row.amount_cents) : null);
         if (!amount) throw badRequest("Name the refund to offer in amountCents.");

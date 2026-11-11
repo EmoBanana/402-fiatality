@@ -163,6 +163,11 @@ export interface PaypalDispute extends PaypalDisputeSummary {
    * provide_evidence, send_message, make_offer, accept_claim, escalate, adjudicate, require_evidence, ...
    */
   actions: string[];
+  /**
+   * Evidence types PayPal asked the seller for (evidences[] with source REQUESTED_FROM_SELLER), oldest first,
+   * e.g. PROOF_OF_FULFILLMENT on a not-received inquiry. PayPal refuses evidence of any other type.
+   */
+  requestedEvidence: string[];
 }
 
 export type PaypalAdjudication = "BUYER_FAVOR" | "SELLER_FAVOR";
