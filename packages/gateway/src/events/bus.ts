@@ -75,6 +75,7 @@ export function eventTabId(event: GatewayEvent): string | null {
     case "agent.finished":
       return event.data.tabId;
     case "purchase.updated":
+    case "dispute.updated":
       return event.data.tabId ?? null;
     default:
       return null;

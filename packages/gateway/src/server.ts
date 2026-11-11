@@ -17,6 +17,7 @@ import { ADMIN_HEADER, adminGuard, isApiPath, isServicePath, routePath, webPageH
 import { paywallRoutes } from "./paywall/route";
 import { agentRoutes } from "./routes/agents";
 import { aiRoutes } from "./routes/ai";
+import { disputeRoutes } from "./routes/disputes";
 import { ledgerRoutes } from "./routes/ledger";
 import { sellerRoutes } from "./routes/sellers";
 import { settlementRoutes } from "./routes/settlement";
@@ -93,6 +94,7 @@ export async function buildServer(ctx: AppContext, opts: BuildServerOptions = {}
     agentRoutes,
     aiRoutes,
     settlementRoutes,
+    disputeRoutes,
     paywallRoutes,
     createEventRoutes({ metricsIntervalMs: opts.metricsIntervalMs }),
   ];

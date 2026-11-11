@@ -1,6 +1,6 @@
 /**
- * Seller payouts (SPEC §6.5). Sellers owed at least the threshold (default $10) are paid their balance
- * floored to cents minus the $0.25 Payouts API fee, in one PayPal batch whose sender_batch_id is our
+ * Seller payouts (SPEC §6.5). Sellers owed at least the threshold (default $10) are paid their balance, less
+ * what open PayPal disputes hold back, floored to cents minus the $0.25 Payouts API fee, in one PayPal batch whose sender_batch_id is our
  * payout id. Balances are debited before PayPal is called (so concurrent runs can't pay twice) and given
  * back for every item PayPal rejects. The mock completes at once; sandbox batches are polled briefly and
  * then refreshed by the scheduler. `payout.completed` fires when a batch reaches a final state.
@@ -8,7 +8,7 @@
 import { MICROS_PER_CENT, newId, PAYPAL_US_FEES, type PayoutDTO } from "@p402/shared";
 import { AppError, type PaypalPayoutBatch } from "../context";
 import { stmt, tx } from "../db/db";
-import { payoutDTO, type PayoutItemRow, type PayoutRow } from "../db/dto";
+import { payoutDTO, sellerHeldMicros, type PayoutItemRow, type PayoutRow } from "../db/dto";
 import { emitSellers, errorFields, type SettlementContext, sleep, withLock } from "./store";
 
 export const DEFAULT_PAYOUT_THRESHOLD_CENTS = 1_000;
@@ -56,8 +56,11 @@ function createPayout(ctx: SettlementContext, thresholdCents: number): { id: str
     `SELECT b.seller_id, b.available_micros FROM seller_balances b JOIN sellers s ON s.id = b.seller_id
       WHERE b.available_micros >= ? ORDER BY b.seller_id`,
   ).all(thresholdCents * MICROS_PER_CENT) as Array<{ seller_id: string; available_micros: number }>;
+  // Earnings under an open PayPal dispute stay until it resolves.
   const items = owed
-    .map((r) => ({ sellerId: r.seller_id, amountCents: Math.floor(r.available_micros / MICROS_PER_CENT) - PAYOUT_FEE_CENTS }))
+    .map((r) => ({ sellerId: r.seller_id, payableMicros: r.available_micros - sellerHeldMicros(db, r.seller_id) }))
+    .filter((r) => r.payableMicros >= thresholdCents * MICROS_PER_CENT)
+    .map((r) => ({ sellerId: r.sellerId, amountCents: Math.floor(r.payableMicros / MICROS_PER_CENT) - PAYOUT_FEE_CENTS }))
     .filter((i) => i.amountCents > 0);
   if (items.length === 0) return null;
 

@@ -1,13 +1,14 @@
 /**
  * GET /api/tabs/:id/statement (SPEC §6.7): per-seller lines, voids by reason, the PayPal fee and its rate,
- * and what per-call payments would have cost. A tab that is not settled yet gets a preview: what closing
+ * what per-call payments would have cost, the paid invoice recorded for the charge and any PayPal disputes on it. A tab that is not settled yet gets a preview: what closing
  * it now would charge, with the fee at the published rate.
  */
 import { effectiveRatePct, type SettlementLineDTO, type StatementDTO } from "@p402/shared";
 import { AppError } from "../context";
 import { stmt } from "../db/db";
-import { companyDTO, getTabDTO, settlementDTO, type CompanyRow } from "../db/dto";
+import { companyDTO, getTabDTO, listDisputeDTOs, settlementDTO, type CompanyRow } from "../db/dto";
 import { latestSettlement } from "./close";
+import { getInvoiceDTO } from "./invoices";
 import { allocateLines, estimatedFeeCents, planSettlement } from "./math";
 import { requireTab, type SettlementContext, unsettledGross, voidStats } from "./store";
 
@@ -55,6 +56,8 @@ export async function statement(ctx: SettlementContext, tabId: string): Promise<
       naiveFeeCents,
       savedCents: Math.max(0, naiveFeeCents - feeCents),
     },
+    invoice: settlement?.status === "completed" ? getInvoiceDTO(db, settlement.id) : null,
+    disputes: listDisputeDTOs(db, { tabId }),
     generatedAt: now,
   };
 }

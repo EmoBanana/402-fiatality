@@ -3,6 +3,7 @@ import { warmUp } from "@p402/ai";
 import { recoverInterruptedRuns } from "./agents/runs";
 import { APP_VERSION, ConfigError, loadConfig, loadDotEnv, type AppConfig } from "./config";
 import { createContext } from "./context";
+import { recoverInterruptedJuries } from "./disputes";
 import { recoverPendingVouchers } from "./paywall/ledger";
 import { recoverInterruptedReviews } from "./review/runner";
 import { seedDemo } from "./seed";
@@ -33,8 +34,9 @@ async function main(): Promise<void> {
     vouchers: recoverPendingVouchers(ctx),
     reviews: recoverInterruptedReviews(ctx),
     runs: recoverInterruptedRuns(ctx),
+    juries: recoverInterruptedJuries(ctx),
   };
-  if (recovered.vouchers + recovered.reviews + recovered.runs > 0) log.warn(recovered, "cleaned up work interrupted by the last shutdown");
+  if (recovered.vouchers + recovered.reviews + recovered.runs + recovered.juries > 0) log.warn(recovered, "cleaned up work interrupted by the last shutdown");
 
   const app = await buildServer(ctx);
   if (config.demo) {

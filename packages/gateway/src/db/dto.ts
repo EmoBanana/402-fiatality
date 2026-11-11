@@ -16,6 +16,10 @@ import {
   type CatalogEntryDTO,
   type ChannelDTO,
   type CompanyDTO,
+  type DisputeActionDTO,
+  type DisputeDTO,
+  type DisputeJuryDTO,
+  type DisputeStatus,
   type EndpointDTO,
   type HttpMethod,
   type PayoutDTO,
@@ -223,6 +227,29 @@ export interface PurchaseRow {
   created_at: number;
 }
 
+export interface DisputeRow {
+  id: string;
+  settlement_id: string | null;
+  tab_id: string | null;
+  company_id: string | null;
+  capture_id: string | null;
+  status: string;
+  reason: string;
+  stage: string | null;
+  amount_cents: number;
+  outcome: string | null;
+  refunded_cents: number;
+  refund_applied_cents: number;
+  buyer_message: string | null;
+  seller_response_due_at: number | null;
+  paypal_actions: string;
+  paypal_updated_at: number | null;
+  jury: string | null;
+  actions: string;
+  created_at: number;
+  updated_at: number;
+}
+
 export interface AgentRunRow {
   id: string;
   tab_id: string;
@@ -295,6 +322,7 @@ export function sellerDTO(db: Db, row: SellerRow, publicBaseUrl: string): Seller
     gatewayUrl: sellerGatewayUrl(publicBaseUrl, row.id),
     balanceMicros: balance?.available_micros ?? 0,
     paidOutMicros: balance?.paid_out_micros ?? 0,
+    heldMicros: sellerHeldMicros(db, row.id),
     createdAt: row.created_at,
     stats: { calls: stats.calls, voids: stats.voids, grossMicros: stats.gross },
   };
@@ -582,4 +610,103 @@ export function agentRunDTO(db: Db, row: AgentRunRow, opts: { steps?: boolean } 
     result: parseJson<AgentRunDTO["result"]>(row.result, null),
     error: row.error,
   };
+}
+
+// ---------------------------------------------------------------- disputes
+
+/** PayPal statuses this DTO knows; anything else is reported as OTHER. */
+const DISPUTE_STATUSES: ReadonlySet<string> = new Set([
+  "OPEN",
+  "WAITING_FOR_BUYER_RESPONSE",
+  "WAITING_FOR_SELLER_RESPONSE",
+  "UNDER_REVIEW",
+  "RESOLVED",
+  "OTHER",
+]);
+
+export function disputeStatusOf(status: string): DisputeStatus {
+  return (DISPUTE_STATUSES.has(status) ? status : "OTHER") as DisputeStatus;
+}
+
+/**
+ * One seller's earnings held back by an unresolved dispute: its net from the disputed charge, pro rata to the
+ * disputed share of the charge (amount ÷ charged, at most 1). A negative net holds nothing.
+ */
+export function heldShareMicros(netMicros: number, amountCents: number, chargedCents: number): number {
+  if (chargedCents <= 0 || netMicros <= 0 || amountCents <= 0) return 0;
+  return Math.floor((netMicros * Math.min(amountCents, chargedCents)) / chargedCents);
+}
+
+/** Per seller, what an unresolved dispute on a settlement holds back. Empty once the dispute is resolved or unlinked. */
+export function disputeHolds(db: Db, dispute: Pick<DisputeRow, "status" | "settlement_id" | "amount_cents">): Map<string, number> {
+  const holds = new Map<string, number>();
+  if (dispute.status === "RESOLVED" || !dispute.settlement_id) return holds;
+  const charged = stmt(db, "SELECT charged_cents FROM settlements WHERE id = ? AND status = 'completed'").get(dispute.settlement_id) as
+    | { charged_cents: number }
+    | undefined;
+  if (!charged) return holds;
+  const lines = stmt(db, "SELECT seller_id, net_micros FROM settlement_lines WHERE settlement_id = ? ORDER BY seller_id").all(
+    dispute.settlement_id,
+  ) as Array<{ seller_id: string; net_micros: number }>;
+  for (const line of lines) {
+    const held = heldShareMicros(line.net_micros, dispute.amount_cents, charged.charged_cents);
+    if (held > 0) holds.set(line.seller_id, held);
+  }
+  return holds;
+}
+
+/** Σ over the seller's unresolved disputes of what each holds back from its payouts. */
+export function sellerHeldMicros(db: Db, sellerId: string): number {
+  const rows = stmt(
+    db,
+    `SELECT l.net_micros, d.amount_cents, s.charged_cents
+       FROM disputes d
+       JOIN settlements s ON s.id = d.settlement_id AND s.status = 'completed'
+       JOIN settlement_lines l ON l.settlement_id = s.id AND l.seller_id = ?
+      WHERE d.status != 'RESOLVED'`,
+  ).all(sellerId) as Array<{ net_micros: number; amount_cents: number; charged_cents: number }>;
+  return rows.reduce((sum, r) => sum + heldShareMicros(r.net_micros, r.amount_cents, r.charged_cents), 0);
+}
+
+export function disputeDTO(db: Db, row: DisputeRow): DisputeDTO {
+  const held = disputeHolds(db, row);
+  return {
+    id: row.id,
+    settlementId: row.settlement_id,
+    tabId: row.tab_id,
+    companyId: row.company_id,
+    captureId: row.capture_id,
+    status: disputeStatusOf(row.status),
+    reason: row.reason,
+    stage: row.stage,
+    amountCents: row.amount_cents,
+    outcome: row.outcome,
+    refundedCents: row.refunded_cents,
+    buyerMessage: row.buyer_message,
+    sellerResponseDueAt: row.seller_response_due_at,
+    heldMicros: [...held.values()].reduce((s, v) => s + v, 0),
+    jury: parseJson<DisputeJuryDTO | null>(row.jury, null),
+    actions: parseJson<DisputeActionDTO[]>(row.actions, []),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function getDisputeRow(db: Db, id: string): DisputeRow | null {
+  return (stmt(db, "SELECT * FROM disputes WHERE id = ?").get(id) as DisputeRow | undefined) ?? null;
+}
+
+export function getDisputeDTO(db: Db, id: string): DisputeDTO | null {
+  const row = getDisputeRow(db, id);
+  return row ? disputeDTO(db, row) : null;
+}
+
+/** Newest first. */
+export function listDisputeDTOs(db: Db, filter: { tabId?: string; settlementId?: string; limit?: number } = {}): DisputeDTO[] {
+  const rows = stmt(
+    db,
+    `SELECT * FROM disputes WHERE (@tabId IS NULL OR tab_id = @tabId) AND (@settlementId IS NULL OR settlement_id = @settlementId)
+      ORDER BY created_at DESC, rowid DESC LIMIT @limit`,
+  ).all({ tabId: filter.tabId ?? null, settlementId: filter.settlementId ?? null, limit: filter.limit ?? 500 }) as DisputeRow[];
+  return rows.map((row) => disputeDTO(db, row));
 }
