@@ -529,68 +529,26 @@
   color: var(--ink-2);
 }
 
-.cs-transcript {
-  list-style: none;
+.cs-review .ui-debate {
   margin-top: var(--space-3);
-  border-top: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
-}
-
-.cs-transcript li {
-  display: grid;
-  grid-template-columns: 150px minmax(0, 1fr);
-  gap: var(--space-2);
-  padding: 14px 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
-  animation: ui-rise var(--duration) var(--ease-out);
-}
-
-.cs-transcript-role {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-family: var(--font-mono);
-  font-size: var(--text-12);
-  font-weight: var(--weight-semibold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--ink);
-}
-
-.cs-transcript-role span {
-  font-family: var(--font-sans);
-  font-weight: var(--weight-regular);
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--muted);
-}
-
-.cs-transcript li[data-role="judge"] .cs-transcript-role {
-  color: var(--accent);
-}
-
-.cs-transcript-text {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: var(--text-14);
-  color: var(--ink);
-}
-
-.cs-transcript-text time {
-  font-size: var(--text-12);
-}
-
-.cs-transcript-pending {
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
 }
 
 .cs-review-verdict {
   margin-top: var(--space-2);
   font-size: var(--text-13);
   color: var(--ink);
+}
+
+.cs-review-report {
+  margin-top: var(--space-2);
+  font-size: var(--text-13);
+  font-weight: var(--weight-medium);
+}
+
+.cs-review-report a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .cs-review-actions {
@@ -1059,9 +1017,6 @@
   }
   .cs-feed-prose {
     grid-column: 2 / -1;
-  }
-  .cs-transcript li {
-    grid-template-columns: 120px minmax(0, 1fr);
   }
 }
 

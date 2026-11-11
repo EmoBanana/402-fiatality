@@ -1,22 +1,20 @@
 /**
  * Shown while a tab is paused or frozen: the alarm, the AI spend review as it streams (prosecutor,
- * defender, judge), the verdict, and the human decision when the review escalates.
+ * defender, judge), the verdict, and the human decision when the review escalates. A frozen agent links to
+ * the jury's full report (/jury#<reviewId>).
  */
-import type { AlarmDTO, ReviewDTO, ReviewRole, ReviewVerdict, TabDetailDTO } from "@p402/shared";
+import type { AlarmDTO, ReviewVerdict, TabDetailDTO } from "@p402/shared";
 import { useState } from "react";
+import { Link } from "react-router";
 import { ReviewVerdictBadge } from "../../components/Badge";
 import { Button } from "../../components/Button";
+import { Debate, SPEND_REVIEW_ROLES } from "../../components/Debate";
 import { describeError } from "../../components/ErrorState";
+import { IconArrowRight } from "../../components/Icons";
 import { Spinner } from "../../components/Spinner";
 import { useToast } from "../../components/Toast";
 import { api } from "../../lib/api";
-import { formatTime, modelLabel, plural } from "../../lib/format";
-
-const ROLES: Array<{ role: ReviewRole; label: string; stance: string }> = [
-  { role: "prosecutor", label: "Prosecutor", stance: "argues it's waste" },
-  { role: "defender", label: "Defender", stance: "argues it's legitimate" },
-  { role: "judge", label: "Judge", stance: "decides" },
-];
+import { modelLabel, plural } from "../../lib/format";
 
 const ALARM_TITLE: Record<AlarmDTO["kind"], string> = {
   repeat_request: "The agent repeated itself",
@@ -99,7 +97,7 @@ export function ReviewBanner({ tab, onChanged }: { tab: TabDetailDTO; onChanged:
         {review?.verdict ? <ReviewVerdictBadge verdict={review.verdict} /> : running ? <Spinner label="Review in progress" /> : null}
       </header>
 
-      {review ? <Transcript review={review} /> : null}
+      {review ? <Debate messages={review.transcript} running={review.status === "running"} roles={SPEND_REVIEW_ROLES} /> : null}
 
       {review && review.status !== "running" && review.reason ? (
         <p className="cs-review-verdict">
@@ -107,6 +105,14 @@ export function ReviewBanner({ tab, onChanged }: { tab: TabDetailDTO; onChanged:
           {typeof review.confidence === "number" ? <span className="muted"> · confidence {review.confidence.toFixed(2)}</span> : null}
           {review.voidedVoucherIds.length ? <span className="muted"> · {plural(review.voidedVoucherIds.length, "call")} flagged</span> : null}
           {review.decidedBy === "human" ? <span className="muted"> · decided by you</span> : null}
+        </p>
+      ) : null}
+
+      {frozen && review && review.status !== "running" ? (
+        <p className="cs-review-report">
+          <Link to={`/jury#${encodeURIComponent(review.id)}`}>
+            Read the jury's report <IconArrowRight size={14} />
+          </Link>
         </p>
       ) : null}
 
@@ -133,36 +139,5 @@ export function ReviewBanner({ tab, onChanged }: { tab: TabDetailDTO; onChanged:
         </div>
       ) : null}
     </section>
-  );
-}
-
-function Transcript({ review }: { review: ReviewDTO }) {
-  const said = new Map(review.transcript.map((m) => [m.role, m]));
-  const next = ROLES.find((r) => !said.has(r.role));
-  return (
-    <ol className="cs-transcript">
-      {ROLES.map(({ role, label, stance }) => {
-        const message = said.get(role);
-        if (!message && !(review.status === "running" && next?.role === role)) return null;
-        return (
-          <li key={role} data-role={role}>
-            <p className="cs-transcript-role">
-              {label}
-              <span>{stance}</span>
-            </p>
-            {message ? (
-              <div className="cs-transcript-text">
-                <p>{message.content}</p>
-                <time className="muted">{formatTime(message.at)}</time>
-              </div>
-            ) : (
-              <p className="cs-transcript-text cs-transcript-pending">
-                <Spinner size={12} label={`${label} is thinking`} /> Thinking…
-              </p>
-            )}
-          </li>
-        );
-      })}
-    </ol>
   );
 }
