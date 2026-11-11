@@ -23,6 +23,7 @@ export { Button, buttonClassName, type ButtonSize, type ButtonVariant } from "./
 export { Callout, type CalloutTone } from "./Callout";
 export { Card } from "./Card";
 export { CopyButton } from "./CopyButton";
+export { Debate, type DebateRole, DISPUTE_ROLES, readableMessage, SPEND_REVIEW_ROLES } from "./Debate";
 export { type DescriptionItem, DescriptionList } from "./DescriptionList";
 export { Drawer } from "./Drawer";
 export { EmptyState } from "./EmptyState";

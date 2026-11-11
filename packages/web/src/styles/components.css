@@ -1499,3 +1499,70 @@
     display: none;
   }
 }
+
+/* ------------------------------------------------------------ debate (AI jury transcript, components/Debate.tsx) */
+
+.ui-debate {
+  list-style: none;
+  border-top: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+.ui-debate li {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: var(--space-2);
+  padding: 14px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  animation: ui-rise var(--duration) var(--ease-out);
+}
+
+.ui-debate-role {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-size: var(--text-12);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.ui-debate-role span {
+  font-family: var(--font-sans);
+  font-weight: var(--weight-regular);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
+
+.ui-debate li[data-role="judge"] .ui-debate-role {
+  color: var(--accent);
+}
+
+.ui-debate-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  font-size: var(--text-14);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.ui-debate-text time {
+  font-size: var(--text-12);
+}
+
+.ui-debate-pending {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+@media (max-width: 1240px) {
+  .ui-debate li {
+    grid-template-columns: 120px minmax(0, 1fr);
+  }
+}

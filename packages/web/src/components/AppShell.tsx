@@ -1,6 +1,7 @@
 /**
- * App frame: top nav, mode badges ("PayPal sandbox|mock", "Gemma 4 · 12b"), live-connection dot and theme
- * toggle, then the page. Mounts <ToastProvider> and scroll restoration.
+ * App frame: top nav (Console, Terminal, Jury, Sellers, Insights, Timeline), mode badges ("PayPal
+ * sandbox|mock", "Gemma 4 · 12b"), live-connection dot and theme toggle, then the page. Mounts
+ * <ToastProvider> and scroll restoration.
  *
  * Route handles (router.tsx):
  *   handle: { wide: true }          full-window width (terminal, insights, timeline)
@@ -22,6 +23,7 @@ import { ToastProvider } from "./Toast";
 export const NAV_LINKS = [
   { to: "/console", label: "Console" },
   { to: "/terminal", label: "Terminal" },
+  { to: "/jury", label: "Jury" },
   { to: "/sellers", label: "Sellers" },
   { to: "/insights", label: "Insights" },
   { to: "/timeline", label: "Timeline" },

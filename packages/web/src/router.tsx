@@ -30,6 +30,7 @@ export const router = createBrowserRouter([
       { index: true, handle: { chrome: "landing" }, lazy: page(() => import("./pages/Landing")) },
       { path: "console", lazy: page(() => import("./pages/Console")) },
       { path: "terminal", handle: { wide: true }, lazy: page(() => import("./pages/Terminal")) },
+      { path: "jury", lazy: page(() => import("./pages/Jury")) },
       { path: "sellers", lazy: page(() => import("./pages/Sellers")) },
       { path: "insights", handle: { wide: true }, lazy: page(() => import("./pages/Insights")) },
       { path: "timeline", handle: { wide: true }, lazy: page(() => import("./pages/Timeline")) },
