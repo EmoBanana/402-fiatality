@@ -8,6 +8,7 @@ import { Link } from "react-router";
 import { buttonClassName } from "../components/Button";
 import { Money } from "../components/Money";
 import { IouTape } from "../features/landing/IouTape";
+import { LiveProof } from "../features/landing/LiveProof";
 import "../features/landing/landing.css";
 import { formatCount, formatPct } from "../lib/format";
 
@@ -96,7 +97,7 @@ export default function Landing() {
                 View terminal
               </Link>
             </div>
-            <p className="lp-hero-note">Runs fully offline in mock mode, or against the PayPal sandbox.</p>
+            <LiveProof />
           </div>
           <IouTape />
         </div>
@@ -252,10 +253,11 @@ export default function Landing() {
 
       <footer className="lp-footer">
         <div className="lp-wrap lp-footer-inner">
-          <p>402 Fiatality · Built for the PayPal AI Hackathon, 2026. Not an official PayPal product.</p>
+          <p>402 Fiatality · Built for the PayPal AI Hackathon 2026</p>
           <nav aria-label="Footer" className="lp-footer-nav">
             <Link to="/console">Console</Link>
             <Link to="/terminal">Terminal</Link>
+            <Link to="/jury">Jury</Link>
             <Link to="/sellers">Sellers</Link>
             <Link to="/insights">Insights</Link>
             <Link to="/timeline">Timeline</Link>
