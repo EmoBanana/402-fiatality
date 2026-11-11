@@ -278,7 +278,7 @@ Each page is a lazily loaded route, so AG Grid, AG Studio and Bryntum load only 
 
 The terminal never routes vouchers through React state: they go straight into AG Grid with `applyTransactionAsync`, batched and deduplicated by id. "Ask the ledger" sends `getStructuredSchema()` and `getState()` to `POST /api/ai/grid-query` and applies only the filter, sort, grouping, aggregation and column-visibility sections of the answer, with column ids checked first.
 
-The design system (`src/styles/tokens.css`, `src/components`) uses CSS variables for light and dark themes, Hanken Grotesk and JetBrains Mono, hairline borders and one brass accent; the brand is a 7-segment 4:02 display beside a segment-letter wordmark. It deliberately uses no PayPal logo or brand colors; PayPal's own pages are used only for approvals. License keys for AG Grid, AG Studio and Bryntum are optional `VITE_*` values read from the repo's `.env`.
+The design system (`src/styles/tokens.css`, `src/components`) uses CSS variables for light and dark themes, Hanken Grotesk and JetBrains Mono, hairline borders and one brass accent; the brand is a receipt-slip mark beside "402 Fiatality" in an arcade pixel face. The nav groups the pages by role (Buyer: Console · Seller: Sellers · Operator: Terminal, Jury, Insights, Timeline), and each route's `handle.role` puts a "Viewing as …" line above its page. It deliberately uses no PayPal logo or brand colors; PayPal's own pages are used only for approvals. License keys for AG Grid, AG Studio and Bryntum are optional `VITE_*` values read from the repo's `.env`.
 
 ## Configuration and the composition root
 

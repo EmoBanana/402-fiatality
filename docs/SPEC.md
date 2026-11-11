@@ -437,11 +437,11 @@ Each requires `x-api-key: demo-<id>-key` (shows the gateway injecting seller key
 ## 9. Web (`packages/web`) — minimal, classy
 
 ### 9.1 Design system
-- Feel: calm and precise, like a digital clock on paper. Lots of whitespace, hairline borders, almost no shadows,
-  one accent. Small labels are spaced caps in the interface face, never mono.
+- Feel: calm and precise, like a receipt. Lots of whitespace, hairline borders, almost no shadows, one accent.
+  Small labels are spaced caps in the interface face, never mono.
 - Type: Hanken Grotesk Variable for every word you read (headings at semibold, tight tracking) + JetBrains Mono
   Variable for IOUs, ids and ledger amounts. `font-variant-numeric: tabular-nums`. Scale 12/13/14/16/20/28/40/56,
-  1.5 body line-height. Segment letters are for the brand only (below).
+  1.5 body line-height. The arcade pixel face is for the name only (below).
 - Light: bg `#F7F5EF`, surface `#FFFDF8`, ink `#17150F`, ink-2 `#3E3A31`, muted `#6E685C`, hairline `#E6E1D5`,
   accent `#8A6626` (brass), accent-soft `#F5EEDD`, success `#15803D`, danger `#B42318`, warning `#B54708`.
   Dark: bg `#0D0C0A`, surface `#151410`, ink `#F2EEE4`, muted `#A49D8E`, hairline `#2A2822`, accent `#AE9070`.
@@ -449,12 +449,14 @@ Each requires `x-api-key: demo-<id>-key` (shows the gateway injecting seller key
   no blue is used. Muted passes AA on every surface. Tokens as CSS variables; light/dark via `prefers-color-scheme`
   + a toggle (`data-theme`).
 - Radius 6 (cards, inputs) / 999 (pills). 8 px spacing grid. Motion 150–200 ms ease-out.
-- Do not use PayPal's logo or brand colors; use the official PayPal approval page for holds. The mark is a small
-  7-segment display reading **4:02** (DSEG7, amber `#F5873F` over faint unlit segments, the colon ticking unless
-  reduced motion is set) beside the wordmark FIATALITY drawn in segment letters (an SVG path, so every letter reads
-  at full height). Sponsor names as plain text, no logos.
-- Components (in `src/components`): AppShell (top nav: Console, Terminal, Jury, Sellers, Insights, Timeline +
-  status badges "PayPal" and "Gemma 4", details on hover), Button, Input, Textarea, Card, Stat, Badge/Pill,
+- Do not use PayPal's logo or brand colors; use the official PayPal approval page for holds. The mark is a receipt
+  slip (a title bar, IOU lines and one amber `#F5873F` total line: many IOUs, one charge), also the favicon, beside
+  the name "402 Fiatality" in Press Start 2P with "402" in the accent. Sponsor names as plain text, no logos.
+- Three roles, explicit everywhere: the nav groups pages by whose view they are, Buyer (Console) · Seller (Sellers)
+  · Operator (Terminal, Jury, Insights, Timeline), each route's `handle.role` sets a "Viewing as …" line above the
+  page, and the demo script labels every step with its view.
+- Components (in `src/components`): AppShell (the grouped nav + status badges "PayPal" and "Gemma 4", details on
+  hover), Button, Input, Textarea, Card, Stat, Badge/Pill,
   Table, EmptyState, Toast, Drawer, Money (formats micros with sub-cent precision).
 
 ### 9.2 Pages
