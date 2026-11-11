@@ -93,7 +93,7 @@ Verified on npm Nov 8 2026 (pin these majors):
 | Tooling | typescript ~5.9.3, tsx ^4.23, vitest ^5.1, concurrently ^10, @types/node ^22 |
 | Gateway | fastify ^5.12, @fastify/websocket ^11.3, @fastify/cors ^11.4, @fastify/helmet ^13.2, @fastify/rate-limit ^11.2, @fastify/static ^10.1, better-sqlite3 ^13.0 (+ @types/better-sqlite3), ajv ^8, zod ^4.6, @paypal/paypal-server-sdk ^2.5, pino-pretty |
 | AI | none required (fetch to Ollama); optional `ollama` ^0.6 |
-| Web | react ^19.3, react-dom ^19.3, react-router ^7.18 (library mode), vite ^8.3, @vitejs/plugin-react ^6.2, ag-grid-react / ag-grid-enterprise ^36.3, ag-charts-react / ag-charts-enterprise ^14.3, ag-studio-react ^3.1, @bryntum/scheduler-enterprise ^8.0 + @bryntum/scheduler-react-enterprise ^8.0, @fontsource-variable/inter, @fontsource-variable/jetbrains-mono |
+| Web | react ^19.3, react-dom ^19.3, react-router ^7.18 (library mode), vite ^8.3, @vitejs/plugin-react ^6.2, ag-grid-react / ag-grid-enterprise ^36.3, ag-charts-react / ag-charts-enterprise ^14.3, ag-studio-react ^3.1, @bryntum/scheduler-enterprise ^8.0 + @bryntum/scheduler-react-enterprise ^8.0, @fontsource-variable/hanken-grotesk, @fontsource/dseg7, @fontsource-variable/jetbrains-mono |
 
 Root scripts (exist): `dev` (gateway + sellers + web), `start`, `build`, `test`, `typecheck`, `agent`,
 `check:paypal`, `check:llm`. Each package needs `dev`/`start`/`typecheck` scripts as relevant.
@@ -437,19 +437,24 @@ Each requires `x-api-key: demo-<id>-key` (shows the gateway injecting seller key
 ## 9. Web (`packages/web`) — minimal, classy
 
 ### 9.1 Design system
-- Feel: calm, precise, editorial. Lots of whitespace, hairline borders, almost no shadows, one accent.
-- Type: Inter Variable (UI) + JetBrains Mono Variable (amounts, ids). `font-variant-numeric: tabular-nums`.
-  Scale 12/13/14/16/20/28/40/56. Tight headings (−0.02em), 1.5 body line-height.
-- Light: bg `#FAFAF8`, surface `#FFFFFF`, ink `#0E0E10`, ink-2 `#3F3F46`, muted `#6B6B73`, hairline `#E7E5E4`,
-  accent `#0F5257` (petrol), accent-soft `#E8F1F0`, success `#15803D`, danger `#B42318`, warning `#B54708`.
-  Dark: bg `#0B0B0C`, surface `#121214`, ink `#F4F4F5`, muted `#A1A1AA`, hairline `#26262A`, accent `#8CCBCB`.
-  (Petrol, not navy: a deep navy sits within ΔE 4 of PayPal's wordmark blues. Muted passes AA on every surface.)
-  Tokens as CSS variables; light/dark via `prefers-color-scheme` + a toggle (`data-theme`).
-- Radius 10 (cards) / 8 (inputs) / 999 (pills). 8 px spacing grid. Motion 150–200 ms ease-out.
-- Do not use PayPal's logo or brand colors; use the official PayPal approval page for holds. Simple "402"
-  monogram + "402 Fiatality" wordmark (emphasize "Fiat": **Fiat**ality). Sponsor names as plain text, no logos.
+- Feel: calm and precise, like a digital clock on paper. Lots of whitespace, hairline borders, almost no shadows,
+  one accent. Small labels are spaced caps in the interface face, never mono.
+- Type: Hanken Grotesk Variable for every word you read (headings at semibold, tight tracking) + JetBrains Mono
+  Variable for IOUs, ids and ledger amounts. `font-variant-numeric: tabular-nums`. Scale 12/13/14/16/20/28/40/56,
+  1.5 body line-height. Segment letters are for the brand only (below).
+- Light: bg `#F7F5EF`, surface `#FFFDF8`, ink `#17150F`, ink-2 `#3E3A31`, muted `#6E685C`, hairline `#E6E1D5`,
+  accent `#8A6626` (brass), accent-soft `#F5EEDD`, success `#15803D`, danger `#B42318`, warning `#B54708`.
+  Dark: bg `#0D0C0A`, surface `#151410`, ink `#F2EEE4`, muted `#A49D8E`, hairline `#2A2822`, accent `#AE9070`.
+  Every accent is at least 20 CIEDE2000 from every PayPal brand color, including the `#FFC439` button yellow, and
+  no blue is used. Muted passes AA on every surface. Tokens as CSS variables; light/dark via `prefers-color-scheme`
+  + a toggle (`data-theme`).
+- Radius 6 (cards, inputs) / 999 (pills). 8 px spacing grid. Motion 150–200 ms ease-out.
+- Do not use PayPal's logo or brand colors; use the official PayPal approval page for holds. The mark is a small
+  7-segment display reading **4:02** (DSEG7, amber `#F5873F` over faint unlit segments, the colon ticking unless
+  reduced motion is set) beside the wordmark FIATALITY drawn in segment letters (an SVG path, so every letter reads
+  at full height). Sponsor names as plain text, no logos.
 - Components (in `src/components`): AppShell (top nav: Console, Terminal, Jury, Sellers, Insights, Timeline +
-  mode badges "PayPal sandbox|mock" and "Gemma 4 · 12b"), Button, Input, Textarea, Card, Stat, Badge/Pill,
+  status badges "PayPal" and "Gemma 4", details on hover), Button, Input, Textarea, Card, Stat, Badge/Pill,
   Table, EmptyState, Toast, Drawer, Money (formats micros with sub-cent precision).
 
 ### 9.2 Pages
