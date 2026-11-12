@@ -5,7 +5,19 @@ import { createLlm } from "../src/llm";
 import { isLlmError, LlmError } from "../src/llm/errors";
 import { parseJsonReply } from "../src/llm/json";
 import { createMockLlm } from "../src/llm/mock";
-import { downServerUrl, type FakeHandler, type FakeServer, lastMessage, ollamaReply, ollamaTags, openAiReply, startFakeServer } from "./helpers/fake-llm-server";
+import { openAiApiRoot } from "../src/llm/openai";
+import {
+  downServerUrl,
+  type FakeHandler,
+  type FakeServer,
+  fakeFetch,
+  lastMessage,
+  ollamaReply,
+  ollamaTags,
+  openAiModels,
+  openAiReply,
+  startFakeServer,
+} from "./helpers/fake-llm-server";
 
 const servers: FakeServer[] = [];
 afterEach(async () => {
@@ -207,6 +219,57 @@ describe("openai-compatible provider", () => {
     const health = await createLlm(config("openai", denied.url)).health();
     expect(health.reachable).toBe(false);
     expect(health.detail).toMatch(/LLM_API_KEY/);
+  });
+
+  // LLM_BASE_URL as each provider documents it, on a fake fetch so the full URLs can be checked.
+  it.each([
+    ["Ollama", "http://localhost:11434", "http://localhost:11434/v1", "gemma4:e4b-it-qat", "gemma4:e4b-it-qat"],
+    ["Groq", "https://api.groq.com/openai/v1", "https://api.groq.com/openai/v1", "llama-3.1-8b-instant", "llama-3.1-8b-instant"],
+    ["OpenRouter", "https://openrouter.ai/api/v1/", "https://openrouter.ai/api/v1", "google/gemma-3-27b-it", "google/gemma-3-27b-it"],
+    [
+      "Gemini",
+      "https://generativelanguage.googleapis.com/v1beta/openai/",
+      "https://generativelanguage.googleapis.com/v1beta/openai",
+      "gemma-4-26b-a4b-it",
+      "models/gemma-4-26b-a4b-it",
+    ],
+  ])("%s at %s: chat completions and the model list", async (_provider, baseUrl, root, model, listedAs) => {
+    const api = fakeFetch((req) => (req.path.endsWith("/models") ? openAiModels("text-embedding-test", listedAs) : openAiReply('{"sum":42,"color":"blue"}')));
+    const llm = createLlm(config("openai", baseUrl, { model, apiKey: "test-key" }), { fetch: api.fetch });
+
+    expect(await llm.json([{ role: "user", content: "?" }], sumSchema)).toEqual({ sum: 42, color: "blue" });
+    expect(await llm.health()).toEqual({ reachable: true, model });
+    expect(api.requests.map((r) => `${r.method} ${r.url}`)).toEqual([`POST ${root}/chat/completions`, `GET ${root}/models`]);
+    expect(api.requests[0]!.headers.authorization).toBe("Bearer test-key");
+  });
+
+  it("matches Gemini's models/ ids but still flags a model the server lacks", async () => {
+    const api = fakeFetch(() => openAiModels("models/gemini-2.5-flash", "models/gemma-4-31b-it"));
+    const gemini = (model: string) =>
+      createLlm(config("openai", "https://generativelanguage.googleapis.com/v1beta/openai", { model }), { fetch: api.fetch });
+    expect((await gemini("gemma-4-31b-it").health()).reachable).toBe(true);
+    expect((await gemini("models/gemma-4-31b-it").health()).reachable).toBe(true);
+    const missing = await gemini("gemma-4-26b-a4b-it").health();
+    expect(missing.reachable).toBe(false);
+    expect(missing.detail).toMatch(/Model gemma-4-26b-a4b-it is not offered by the server/);
+  });
+});
+
+describe("openAiApiRoot", () => {
+  it.each([
+    ["http://localhost:11434", "http://localhost:11434/v1"],
+    ["http://localhost:11434/", "http://localhost:11434/v1"],
+    ["http://localhost:11434/v1/", "http://localhost:11434/v1"],
+    ["https://api.openai.com", "https://api.openai.com/v1"],
+    ["https://api.groq.com/openai/v1/", "https://api.groq.com/openai/v1"],
+    ["https://openrouter.ai/api/v1", "https://openrouter.ai/api/v1"],
+    ["https://generativelanguage.googleapis.com/v1beta/openai", "https://generativelanguage.googleapis.com/v1beta/openai"],
+    ["https://generativelanguage.googleapis.com/v1beta/openai//", "https://generativelanguage.googleapis.com/v1beta/openai"],
+    // A path prefix without a version (a reverse proxy), and a version-looking host name, still get /v1.
+    ["http://gpu-box:8080/ollama", "http://gpu-box:8080/ollama/v1"],
+    ["http://v1.lan:11434", "http://v1.lan:11434/v1"],
+  ])("%s -> %s", (baseUrl, root) => {
+    expect(openAiApiRoot(baseUrl)).toBe(root);
   });
 });
 

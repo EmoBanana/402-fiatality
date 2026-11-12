@@ -1,6 +1,6 @@
 /**
- * Any OpenAI-compatible server: POST {baseUrl}/v1/chat/completions with `response_format: json_schema`
- * for structured output, GET {baseUrl}/v1/models for health.
+ * Any OpenAI-compatible server: POST {root}/chat/completions with `response_format: json_schema`
+ * for structured output, GET {root}/models for health. {root} comes from LLM_BASE_URL (openAiApiRoot).
  */
 import type { LlmCallOptions, LlmConfig, LlmHealth, LlmMessage } from "@p402/gateway/context";
 import type { ChatRequestDTO, ChatResponseDTO } from "@p402/shared";
@@ -19,14 +19,33 @@ interface ChatCompletionBody {
   choices?: Array<{ message?: { content?: unknown }; finish_reason?: unknown }>;
 }
 
+/** A path segment that names an API version: v1, v2, v1beta, v1alpha, v1beta1. */
+const VERSION_SEGMENT = /^v\d+(?:alpha|beta)?\d*$/i;
+
+/**
+ * The URL that /chat/completions and /models hang off. A base URL whose path already names an API version is
+ * used as given (Groq …/openai/v1, OpenRouter …/api/v1, Gemini …/v1beta/openai); any other gets /v1 (Ollama
+ * http://localhost:11434, https://api.openai.com). Trailing slashes are ignored.
+ */
+export function openAiApiRoot(baseUrl: string): string {
+  const root = baseUrl.replace(/\/+$/, "");
+  let path = root;
+  try {
+    path = new URL(root).pathname;
+  } catch {
+    // Not an absolute URL: look for a version in the text as given.
+  }
+  return path.split("/").some((segment) => VERSION_SEGMENT.test(segment)) ? root : `${root}/v1`;
+}
+
 export function createOpenAiLlm(config: LlmConfig, opts: OpenAiOptions = {}): AiLlmClient {
   const { model } = config;
-  const baseUrl = config.baseUrl.replace(/\/+$/, "").replace(/\/v1$/, "");
+  const apiRoot = openAiApiRoot(config.baseUrl);
   const headers: Record<string, string> = config.apiKey ? { authorization: `Bearer ${config.apiKey}` } : {};
   const unreachableHint = "Check LLM_BASE_URL and that the server is running.";
 
   async function call(path: string, body: unknown, timeoutMs: number, signal?: AbortSignal): Promise<HttpResult> {
-    return httpJson(`${baseUrl}${path}`, {
+    return httpJson(`${apiRoot}${path}`, {
       body,
       headers,
       timeoutMs,
@@ -39,7 +58,7 @@ export function createOpenAiLlm(config: LlmConfig, opts: OpenAiOptions = {}): Ai
 
   async function complete(messages: LlmMessage[], callOpts: LlmCallOptions, responseFormat?: unknown): Promise<Completion> {
     const result = await call(
-      "/v1/chat/completions",
+      "/chat/completions",
       {
         model,
         messages,
@@ -82,7 +101,7 @@ export function createOpenAiLlm(config: LlmConfig, opts: OpenAiOptions = {}): Ai
 
     async health(): Promise<LlmHealth> {
       try {
-        const result = await httpJson(`${baseUrl}/v1/models`, {
+        const result = await httpJson(`${apiRoot}/models`, {
           headers,
           timeoutMs: HEALTH_TIMEOUT_MS,
           fetchImpl: opts.fetch,
@@ -96,7 +115,9 @@ export function createOpenAiLlm(config: LlmConfig, opts: OpenAiOptions = {}): Ai
         if (!result.ok) return { reachable: false, model, detail: `The LLM server answered HTTP ${result.status}: ${serverError(result)}` };
         const data = isRecord(result.body) && Array.isArray(result.body.data) ? (result.body.data as Array<{ id?: unknown }>) : [];
         const ids = data.map((m) => m.id).filter((id): id is string => typeof id === "string");
-        if (ids.length > 0 && !ids.includes(model)) {
+        // Gemini lists "models/gemma-4-26b-a4b-it" for the "gemma-4-26b-a4b-it" that chat requests name.
+        const bare = (id: string) => id.replace(/^models\//, "");
+        if (ids.length > 0 && !ids.some((id) => bare(id) === bare(model))) {
           return { reachable: false, model, detail: `Model ${model} is not offered by the server (has: ${ids.slice(0, 5).join(", ")})` };
         }
         return { reachable: true, model };
@@ -107,7 +128,7 @@ export function createOpenAiLlm(config: LlmConfig, opts: OpenAiOptions = {}): Ai
 
     async chatCompletion(request: ChatRequestDTO, callOpts: ChatCompletionOptions = {}): Promise<ChatResponseDTO> {
       const result = await call(
-        "/v1/chat/completions",
+        "/chat/completions",
         { ...request, model, stream: false },
         callOpts.timeoutMs ?? CHAT_PROXY_TIMEOUT_MS,
         callOpts.signal,

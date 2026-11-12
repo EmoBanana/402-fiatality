@@ -1,6 +1,6 @@
 /**
- * A scriptable stand-in for Ollama / an OpenAI-compatible server on 127.0.0.1, ports 4300-4399.
- * Records every request; the handler decides each reply (status, JSON body, delay).
+ * A scriptable stand-in for Ollama / an OpenAI-compatible server on 127.0.0.1, ports 4300-4399, plus a fetch
+ * stand-in for hosted providers. Records every request; the handler decides each reply (status, JSON body, delay).
  */
 import { createServer, type IncomingHttpHeaders } from "node:http";
 import { createServer as createNetServer, type Server as NetServer } from "node:net";
@@ -141,6 +141,40 @@ export function openAiReply(content: string): FakeReply {
       choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }],
     },
   };
+}
+
+/** An OpenAI GET /models list. */
+export function openAiModels(...ids: string[]): FakeReply {
+  return { json: { object: "list", data: ids.map((id) => ({ id, object: "model", owned_by: "test" })) } };
+}
+
+export interface FakeFetchRequest extends FakeRequest {
+  /** The full URL, e.g. https://api.groq.com/openai/v1/chat/completions. */
+  url: string;
+}
+
+/**
+ * A fetch stand-in for hosted providers (Groq, OpenRouter, Gemini), so tests can check the exact URLs sent
+ * without a network. Records every request; the handler decides each reply (delayMs is ignored).
+ */
+export function fakeFetch(handler: FakeHandler): { fetch: typeof fetch; requests: FakeFetchRequest[] } {
+  const requests: FakeFetchRequest[] = [];
+  const fetchImpl = async (input: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
+    const url = String(input);
+    const { pathname, search } = new URL(url);
+    const raw = typeof init.body === "string" ? init.body : "";
+    const record: FakeFetchRequest = {
+      method: init.method ?? "GET",
+      url,
+      path: pathname + search,
+      headers: { ...(init.headers as Record<string, string> | undefined) },
+      body: raw ? JSON.parse(raw) : null,
+    };
+    const reply = await handler(record, requests.push(record) - 1);
+    const type = reply.text === undefined ? "application/json" : "text/plain";
+    return new Response(reply.text ?? JSON.stringify(reply.json ?? {}), { status: reply.status ?? 200, headers: { "content-type": type } });
+  };
+  return { fetch: fetchImpl as typeof fetch, requests };
 }
 
 /** Text of the last message of an /api/chat or /v1/chat/completions request. */

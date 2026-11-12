@@ -5,7 +5,7 @@ import { chatProxy } from "../src/chat/proxy";
 import { createLlm } from "../src/llm";
 import { isLlmError } from "../src/llm/errors";
 import { createMockLlm } from "../src/llm/mock";
-import { downServerUrl, type FakeHandler, type FakeServer, ollamaReply, openAiReply, startFakeServer } from "./helpers/fake-llm-server";
+import { downServerUrl, type FakeHandler, type FakeServer, fakeFetch, ollamaReply, openAiReply, startFakeServer } from "./helpers/fake-llm-server";
 
 const servers: FakeServer[] = [];
 afterEach(async () => {
@@ -98,6 +98,23 @@ describe("chatProxy", () => {
     expect(server.requests[0]!.path).toBe("/v1/chat/completions");
     expect(server.requests[0]!.body).toMatchObject({ model: "gemma4:12b", stream: false });
     expect(out.choices[0]!.message.content).toBe("Hi!");
+  });
+
+  it("forwards to a versioned base URL such as Gemini's without adding /v1", async () => {
+    const api = fakeFetch(() => openAiReply("Channel3 leads on spend."));
+    const llm = createLlm(
+      { provider: "openai", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/", model: "gemma-4-26b-a4b-it", apiKey: "test-key" },
+      { fetch: api.fetch },
+    );
+    const out = await chatProxy(llm, { messages: [{ role: "user", content: "Spend by seller?" }], tools: TOOLS, tool_choice: "auto", stream: true });
+
+    expect(api.requests).toHaveLength(1);
+    const req = api.requests[0]!;
+    expect(`${req.method} ${req.url}`).toBe("POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions");
+    expect(req.headers.authorization).toBe("Bearer test-key");
+    expect(req.body).toMatchObject({ model: "gemma-4-26b-a4b-it", stream: false, tools: TOOLS, tool_choice: "auto" });
+    expect(out.object).toBe("chat.completion");
+    expect(out.choices[0]!.message.content).toBe("Channel3 leads on spend.");
   });
 
   it("falls back to plain chat for clients without chat completions", async () => {

@@ -20,7 +20,10 @@ export type LlmProvider = "ollama" | "openai" | "mock";
 
 export interface LlmConfig {
   provider: LlmProvider;
-  /** Ollama: http://localhost:11434. openai: an OpenAI-compatible origin (requests go to {baseUrl}/v1/...). */
+  /**
+   * Ollama: http://localhost:11434. openai: an OpenAI-compatible URL; /v1 is added unless its path already names a
+   * version (Groq …/openai/v1, Gemini …/v1beta/openai).
+   */
   baseUrl: string;
   model: string;
   apiKey: string | null;
