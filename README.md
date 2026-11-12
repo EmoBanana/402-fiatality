@@ -14,7 +14,7 @@ Built for the PayPal AI Hackathon on Devpost, 2026. It runs fully offline in moc
 
 ## Live demo
 
-**Live demo: _link coming soon_**. It runs on Render with Gemma 4 on the Gemini API (`gemma-4-26b-a4b-it`), so there's nothing to install. It's on Render's free plan: after 15 idle minutes it sleeps, the first visit takes about a minute to wake it, and its data starts fresh.
+**Live demo: [fiatality.onrender.com](https://fiatality.onrender.com)**. It runs on Render with Gemma 4 on the Gemini API (`gemma-4-26b-a4b-it`), so there's nothing to install. It's on Render's free plan: after 15 idle minutes it sleeps, the first visit takes about a minute to wake it, and its data starts fresh.
 
 - In the console's first step, click **Add company** to open your own tab (a company has one open tab at a time).
 - The PayPal pages are PayPal's real sandbox. Approve holds and purchases with your own sandbox buyer account (developer.paypal.com → Testing Tools → Sandbox Accounts) or the test buyer in the Devpost notes. No real money moves.
