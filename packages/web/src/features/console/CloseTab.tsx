@@ -1,8 +1,9 @@
 /**
  * Step 6: close the tab with one PayPal capture (billable floored to the cent; the sub-cent remainder
  * carries to the company's next tab), then the settlement as a short ledger and a link to the statement.
+ * This is the buyer's view: PayPal's fee comes out of what sellers receive, so it shows on the Sellers page instead.
  */
-import { effectiveRatePct, microsToCentsFloor, type SettlementDTO, type TabDetailDTO } from "@p402/shared";
+import { microsToCentsFloor, type SettlementDTO, type TabDetailDTO } from "@p402/shared";
 import { useState } from "react";
 import { Link } from "react-router";
 import { SettlementStatusBadge } from "../../components/Badge";
@@ -14,10 +15,9 @@ import { Spinner } from "../../components/Spinner";
 import { Table } from "../../components/Table";
 import { useToast } from "../../components/Toast";
 import { api } from "../../lib/api";
-import { formatCents, formatCount, formatPct, plural } from "../../lib/format";
+import { formatCents, formatCount, plural } from "../../lib/format";
 
 export function SettlementLedger({ settlement }: { settlement: SettlementDTO }) {
-  const rate = effectiveRatePct(settlement.paypalFeeCents, settlement.chargedCents);
   return (
     <div className="cs-settlement">
       <ol className="ui-ledger cs-settlement-ledger">
@@ -36,27 +36,17 @@ export function SettlementLedger({ settlement }: { settlement: SettlementDTO }) 
           <span className="ui-ledger-label">Carried to the next tab</span>
           <Money micros={settlement.carryOutMicros} padTo={4} className="ui-ledger-amount" />
         </li>
-        <li className="ui-ledger-row">
-          <span className="ui-ledger-label">PayPal fee · {formatPct(rate)}, split across sellers</span>
-          <Money cents={settlement.paypalFeeCents} padTo={4} className="ui-ledger-amount" />
-        </li>
-        <li className="ui-ledger-row cs-settlement-naive">
-          <span className="ui-ledger-label">Fees if every call were its own payment</span>
-          <Money cents={settlement.naiveFeeCents} padTo={4} className="ui-ledger-amount" />
-        </li>
       </ol>
       {settlement.lines.length ? (
         <Table
           dense
-          caption="What each seller earned from this tab"
+          caption="What you paid each seller"
           rows={settlement.lines}
           rowKey={(l) => l.sellerId}
           columns={[
             { key: "seller", header: "Seller", render: (l) => l.sellerName ?? l.sellerId },
             { key: "calls", header: "Calls", align: "right", render: (l) => formatCount(l.calls) },
-            { key: "gross", header: "Gross", align: "right", render: (l) => <Money micros={l.grossMicros} padTo={6} /> },
-            { key: "fee", header: "Fee share", align: "right", render: (l) => <Money micros={-l.feeShareMicros} padTo={6} /> },
-            { key: "net", header: "Net to seller", align: "right", render: (l) => <Money micros={l.netMicros} padTo={6} /> },
+            { key: "paid", header: "Paid", align: "right", render: (l) => <Money micros={l.grossMicros} padTo={6} /> },
           ]}
         />
       ) : null}

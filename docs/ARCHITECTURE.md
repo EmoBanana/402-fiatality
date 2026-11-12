@@ -265,7 +265,7 @@ A voucher is `pending` only while its call is in flight: it counts toward limits
 | `/sellers` | Seller portal: totals including what is held for disputes, seller cards with prices, balances, holds and void rates, "List your API", payouts and their history | |
 | `/insights` | Spend by seller and voids by reason over a chosen range; fee rate by tab size and per-call vs batched fees; "Explore the ledger" in AG Studio with its AI assistant on Gemma | AG Charts, AG Studio |
 | `/timeline` | Every tab's hold on one schedule against the demo clock, with drag-to-reschedule and a "+1 day" fast-forward in demo mode | Bryntum Scheduler |
-| `/statements/:tabId` | A printable statement: the charge, fees against per-call payments, the per-seller split, PayPal disputes on the charge with the jury's recommendation, and the PayPal references, including the paid invoice when one was recorded | |
+| `/statements/:tabId` | The buyer's printable statement: the charge, what was paid to each seller, PayPal disputes on the charge with the jury's recommendation, the agent's purchases with their refunds, and the PayPal references, including the paid invoice when one was recorded. PayPal's fee is the sellers', so it isn't on it | |
 
 Each page is a lazily loaded route, so AG Grid, AG Studio and Bryntum load only with the pages that use them. The data layer lives in `src/lib`:
 

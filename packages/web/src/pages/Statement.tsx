@@ -1,8 +1,9 @@
 /**
- * Printable statement for one tab (SPEC §9.2): the one PayPal charge, what was billable, carried and voided,
- * fees against per-call payments, the per-seller split, PayPal disputes on the charge (with the AI jury's
- * recommendation), the agent's purchases with their refunds, and the PayPal references, including the invoice
- * recorded for the charge. Prints black on white without the app chrome (statement.css + base.css print rules).
+ * The buyer's printable statement for one tab (SPEC §9.2): the one PayPal charge, what was billable, carried and
+ * voided, what was paid to each seller, PayPal disputes on the charge (with the AI jury's recommendation), the agent's
+ * purchases with their refunds, and the PayPal references, including the invoice recorded for the charge. PayPal's fee
+ * is the sellers' (the Sellers page shows it), so it isn't here. Prints black on white without the app chrome
+ * (statement.css + base.css print rules).
  */
 import type { DisputeDTO, InvoiceDTO, PurchaseDTO, PurchaseRefundDTO, StatementDTO } from "@p402/shared";
 import { useEffect } from "react";
@@ -20,7 +21,7 @@ import { Table } from "../components/Table";
 import { confidencePct, disputeBadge, disputeReasonLabel, RECOMMENDATION, sentenceCase } from "../features/jury/docket";
 import "../features/statement/statement.css";
 import { ApiError, api } from "../lib/api";
-import { formatCount, formatDate, formatDateTime, formatPct, formatUsd, plural, voidReasonLabel } from "../lib/format";
+import { formatCount, formatDate, formatDateTime, formatUsd, plural, voidReasonLabel } from "../lib/format";
 import { useResource } from "../lib/resource";
 
 function Period({ statement }: { statement: StatementDTO }) {
@@ -177,13 +178,11 @@ function Purchases({ purchases }: { purchases: PurchaseDTO[] }) {
 }
 
 function StatementBody({ statement }: { statement: StatementDTO }) {
-  const { tab, company, settlement, fees, voids } = statement;
+  const { tab, company, settlement, voids } = statement;
   const settled = Boolean(settlement && settlement.status === "completed");
   const billable = settlement?.billableMicros ?? tab.totals.billableMicros + tab.carryInMicros;
   const lines = settlement?.lines.length ? settlement.lines : statement.sellers;
   const totalGross = lines.reduce((s, l) => s + l.grossMicros, 0);
-  const totalFee = lines.reduce((s, l) => s + l.feeShareMicros, 0);
-  const totalNet = lines.reduce((s, l) => s + l.netMicros, 0);
   const totalCalls = lines.reduce((s, l) => s + l.calls, 0);
   const reasons = Object.entries(voids.byReason).sort((a, b) => b[1] - a[1]);
   const policy = tab.policy;
@@ -274,50 +273,26 @@ function StatementBody({ statement }: { statement: StatementDTO }) {
           </ol>
         </section>
 
-        <section aria-labelledby="st-fees">
-          <h2 id="st-fees">Fees</h2>
-          <ol className="ui-ledger st-ledger">
-            <li className="ui-ledger-row">
-              <span className="ui-ledger-label">PayPal fee · {formatPct(fees.effectiveRatePct)}</span>
-              <Money cents={fees.paypalFeeCents} padTo={2} className="ui-ledger-amount" />
-            </li>
-            <li className="ui-ledger-row">
-              <span className="ui-ledger-label">If each call were a PayPal payment</span>
-              <Money cents={fees.naiveFeeCents} padTo={2} className="ui-ledger-amount" />
-            </li>
-            <li className="ui-ledger-total ui-ledger-grand">
-              <span className="ui-ledger-label">Saved by batching</span>
-              <Money cents={fees.savedCents} padTo={2} className="ui-ledger-amount" />
-            </li>
-          </ol>
-          <p className="st-note">The PayPal fee is split across sellers in proportion to what each earned.</p>
+        {/* What the buyer paid each seller. PayPal's fee is the sellers' (it comes out of what they receive), so it
+            lives in the seller view, not here. */}
+        <section aria-labelledby="st-sellers">
+          <h2 id="st-sellers">By seller</h2>
+          <Table
+            dense
+            caption="What you paid each seller"
+            rows={lines}
+            rowKey={(l) => l.sellerId}
+            empty={<EmptyState compact title="No billable calls" description="Nothing was billed on this tab." />}
+            columns={[
+              { key: "seller", header: "Seller", render: (l) => l.sellerName ?? l.sellerId },
+              { key: "calls", header: "Calls", align: "right", render: (l) => formatCount(l.calls) },
+              { key: "paid", header: "Paid", align: "right", render: (l) => <Money micros={l.grossMicros} padTo={6} /> },
+            ]}
+            footer={{ seller: "Total", calls: formatCount(totalCalls), paid: <Money micros={totalGross} padTo={6} /> }}
+            footerVariant="grand"
+          />
         </section>
       </div>
-
-      <section aria-labelledby="st-sellers" className="st-section">
-        <h2 id="st-sellers">By seller</h2>
-        <Table
-          caption="Gross, fee share and net for each seller"
-          rows={lines}
-          rowKey={(l) => l.sellerId}
-          empty={<EmptyState compact title="No billable calls" description="Nothing was earned on this tab." />}
-          columns={[
-            { key: "seller", header: "Seller", render: (l) => l.sellerName ?? l.sellerId },
-            { key: "calls", header: "Calls", align: "right", render: (l) => formatCount(l.calls) },
-            { key: "gross", header: "Gross", align: "right", render: (l) => <Money micros={l.grossMicros} padTo={6} /> },
-            { key: "fee", header: "PayPal fee share", align: "right", render: (l) => <Money micros={-l.feeShareMicros} padTo={6} /> },
-            { key: "net", header: "Net to seller", align: "right", render: (l) => <Money micros={l.netMicros} padTo={6} /> },
-          ]}
-          footer={{
-            seller: "Total",
-            calls: formatCount(totalCalls),
-            gross: <Money micros={totalGross} padTo={6} />,
-            fee: <Money micros={-totalFee} padTo={6} />,
-            net: <Money micros={totalNet} padTo={6} />,
-          }}
-          footerVariant="grand"
-        />
-      </section>
 
       {statement.disputes?.length ? <Disputes disputes={statement.disputes} /> : null}
       {statement.purchases?.length ? <Purchases purchases={statement.purchases} /> : null}

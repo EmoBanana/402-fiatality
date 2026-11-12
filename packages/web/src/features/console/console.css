@@ -1013,20 +1013,6 @@
   font-size: var(--text-13);
 }
 
-.cs-settlement-naive {
-  color: var(--muted);
-}
-
-.cs-settlement-naive .ui-ledger-amount {
-  color: var(--danger);
-  text-decoration: line-through;
-  text-decoration-thickness: 1px;
-}
-
-.cs-settlement-naive .ui-ledger-amount .ui-money-sub {
-  color: inherit;
-}
-
 /* ------------------------------------------------------------ responsive (app pages: 1024 px and up) */
 
 @media (max-width: 1240px) {
