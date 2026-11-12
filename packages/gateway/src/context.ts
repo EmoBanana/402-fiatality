@@ -27,6 +27,8 @@ import type {
   PurchaseCheckoutDTO,
   PurchaseDTO,
   PurchaseProposalDTO,
+  PurchaseRefundRequestDTO,
+  PurchaseRefundResultDTO,
   ReviewFault,
   ReviewMessageDTO,
   ReviewVerdict,
@@ -83,6 +85,10 @@ export interface PaypalOrder {
   approveUrl: string | null;
   /** The payer's PayPal email once known (payment_source.paypal.email_address, or the deprecated payer). */
   payerEmail?: string | null;
+  /** CAPTURE orders: the capture once taken (purchase_units[0].payments.captures[0].id). */
+  captureId?: string | null;
+  /** Refunds of that capture (purchase_units[0].payments.refunds), each with the invoice_id we sent. */
+  refunds?: PaypalOrderRefund[];
 }
 
 export interface PaypalAuthorization {
@@ -177,7 +183,13 @@ export interface PaypalRefund {
   id: string;
   /** CANCELLED | FAILED | PENDING | COMPLETED */
   status: string;
-  amountCents: number;
+  /** PayPal's amount, else the amount we asked for; null when PayPal named none and we asked for "all of it". */
+  amountCents: number | null;
+}
+
+/** A refund as an order lists it (Orders v2 GET), found again by the invoice_id we sent with it. */
+export interface PaypalOrderRefund extends PaypalRefund {
+  invoiceId: string | null;
 }
 
 /** Invoicing v2: a paid invoice recorded for one tab charge (draft -> sent as a share link -> payment recorded). */
@@ -284,10 +296,10 @@ export interface PaypalClient {
   requireDisputeEvidence(disputeId: string, action: "BUYER_EVIDENCE" | "SELLER_EVIDENCE"): Promise<void>;
 
   // ---- Payments v2
-  /** Refund a capture (all of it when amountCents is omitted). */
+  /** Refund a capture (all of it when amountCents is omitted). note_to_payer is sent only when given. */
   refundCapture(
     captureId: string,
-    input: { amountCents?: number | null; invoiceId: string; noteToPayer: string; requestId: string },
+    input: { amountCents?: number | null; invoiceId: string; noteToPayer?: string; requestId: string },
   ): Promise<PaypalRefund>;
 
   // ---- Invoicing v2 (REST)
@@ -301,6 +313,12 @@ export interface PaypalClient {
 // ===================================================================== Settlement (paypal-builder)
 
 export type CloseReason = "manual" | "threshold" | "scheduled" | "expiring";
+
+/** refundPurchase's answer: `replay` when the idempotency key had already been used (the route answers 200, not 201). */
+export interface PurchaseRefundOutcome {
+  result: PurchaseRefundResultDTO;
+  replay: boolean;
+}
 
 /**
  * The tab's life with PayPal (SPEC §6): hold -> authorize -> reauthorize -> one capture -> payouts.
@@ -325,6 +343,8 @@ export interface SettlementService {
   proposePurchase(input: PurchaseProposalDTO): Promise<PurchaseDTO>;
   /** POST /api/purchases/:id/checkout: create the CAPTURE order a human approves. */
   checkoutPurchase(purchaseId: string): Promise<PurchaseCheckoutDTO>;
+  /** POST /api/purchases/:id/refund: refund a paid purchase, in full or in part. Same idempotency key, same refund. */
+  refundPurchase(purchaseId: string, input: PurchaseRefundRequestDTO): Promise<PurchaseRefundOutcome>;
   /** GET /api/tabs/:id/statement */
   statement(tabId: string): Promise<StatementDTO>;
   /** Run tick() every 30 s until stop(). */
@@ -683,6 +703,7 @@ function stubSettlement(): SettlementService {
     runPayouts: missing("settlement.runPayouts"),
     proposePurchase: missing("settlement.proposePurchase"),
     checkoutPurchase: missing("settlement.checkoutPurchase"),
+    refundPurchase: missing("settlement.refundPurchase"),
     statement: missing("settlement.statement"),
     start: () => {},
     stop: () => {},

@@ -6,11 +6,11 @@
 import { effectiveRatePct, type SettlementLineDTO, type StatementDTO } from "@p402/shared";
 import { AppError } from "../context";
 import { stmt } from "../db/db";
-import { companyDTO, getTabDTO, listDisputeDTOs, settlementDTO, type CompanyRow } from "../db/dto";
+import { companyDTO, getTabDTO, listDisputeDTOs, settlementDTO, type CompanyRow, type PurchaseRow } from "../db/dto";
 import { latestSettlement } from "./close";
 import { getInvoiceDTO } from "./invoices";
 import { allocateLines, estimatedFeeCents, planSettlement } from "./math";
-import { requireTab, type SettlementContext, unsettledGross, voidStats } from "./store";
+import { purchaseView, requireTab, type SettlementContext, unsettledGross, voidStats } from "./store";
 
 export async function statement(ctx: SettlementContext, tabId: string): Promise<StatementDTO> {
   const { db } = ctx;
@@ -58,6 +58,9 @@ export async function statement(ctx: SettlementContext, tabId: string): Promise<
     },
     invoice: settlement?.status === "completed" ? getInvoiceDTO(db, settlement.id) : null,
     disputes: listDisputeDTOs(db, { tabId }),
+    purchases: (stmt(db, "SELECT * FROM purchases WHERE tab_id = ? ORDER BY created_at DESC, rowid DESC").all(tabId) as PurchaseRow[]).map(
+      (row) => purchaseView(db, row),
+    ),
     generatedAt: now,
   };
 }

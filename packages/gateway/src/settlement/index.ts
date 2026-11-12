@@ -13,6 +13,7 @@ import { createHold } from "./holds";
 import { retryInvoices } from "./invoices";
 import { runPayouts } from "./payouts";
 import { checkoutPurchase, proposePurchase } from "./purchases";
+import { refundPurchase } from "./refunds";
 import { tickOnce } from "./scheduler";
 import { statement } from "./statement";
 import { errorFields } from "./store";
@@ -23,7 +24,7 @@ export { BRAND_NAME, hashEnrollToken, HOLD_DESCRIPTION, rescheduleTab, SOFT_DESC
 export { allocateLines, planSettlement, type PlannedLine, type SellerGross, type SettlementPlan } from "./math";
 export { DEFAULT_PAYOUT_THRESHOLD_CENTS, PAYOUT_FEE_CENTS } from "./payouts";
 export { getInvoiceDTO, invoiceNumber, queueInvoice, recordInvoice, retryInvoices } from "./invoices";
-export { pendingCarry, type SettlementContext } from "./store";
+export { pendingCarry, purchaseView, type SettlementContext } from "./store";
 
 /** SPEC §6.3: the scheduler runs every 30 s. */
 export const TICK_INTERVAL_MS = 30_000;
@@ -45,6 +46,7 @@ export function createSettlementService(ctx: AppContext): SettlementService {
     runPayouts: (opts) => runPayouts(ctx, opts),
     proposePurchase: (input) => proposePurchase(ctx, input),
     checkoutPurchase: (purchaseId) => checkoutPurchase(ctx, purchaseId),
+    refundPurchase: (purchaseId, input) => refundPurchase(ctx, purchaseId, input),
     statement: (tabId) => statement(ctx, tabId),
     start() {
       if (timer) return;

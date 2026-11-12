@@ -262,6 +262,21 @@ CREATE TABLE IF NOT EXISTS purchases (
 );
 CREATE INDEX IF NOT EXISTS purchases_tab ON purchases (tab_id, created_at);
 
+-- Refunds of captured purchases. The row is the claim: written before PayPal is called, so the same idempotency key
+-- finds it instead of refunding twice. PayPal-Request-Id and invoice_id are both refund-<id> (paypal-plan.md).
+CREATE TABLE IF NOT EXISTS purchase_refunds (
+  id               TEXT PRIMARY KEY,
+  purchase_id      TEXT NOT NULL REFERENCES purchases(id),
+  idempotency_key  TEXT NOT NULL,
+  amount_cents     INTEGER NOT NULL CHECK (amount_cents > 0),
+  status           TEXT NOT NULL CHECK (status IN ('processing', 'completed', 'pending', 'failed', 'rejected', 'unknown')),
+  paypal_refund_id TEXT,
+  error            TEXT,
+  created_at       INTEGER NOT NULL,
+  updated_at       INTEGER NOT NULL,
+  UNIQUE (purchase_id, idempotency_key)
+);
+
 CREATE TABLE IF NOT EXISTS agent_runs (
   id           TEXT PRIMARY KEY,
   tab_id       TEXT NOT NULL REFERENCES tabs(id),

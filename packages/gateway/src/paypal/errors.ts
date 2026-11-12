@@ -151,3 +151,20 @@ export function toPaypalError(err: unknown, operation: string): PaypalError {
   // Only the message: never the error object (axios errors carry the request config and headers).
   return new PaypalError({ operation, paypalName: "NETWORK_ERROR", message: message.slice(0, 200) });
 }
+
+/**
+ * A write PayPal may have carried out without our learning it: the call itself (not the token request before it) got
+ * no answer, an unreadable one, or a 5xx. Its outcome is unknown, never failed, so re-read before reporting anything.
+ */
+export function outcomeUnknown(err: unknown, operation: string): err is PaypalError {
+  if (!(err instanceof PaypalError) || err.operation !== operation) return false;
+  if (err.httpStatus === null) return ["TIMEOUT", "NETWORK_ERROR", "INVALID_RESPONSE"].includes(err.paypalName);
+  return err.httpStatus >= 500;
+}
+
+/** PayPal's own reason for refusing a request (its first issue, else its error name), for the caller to read. */
+export function paypalReason(err: PaypalError): string {
+  const issue = err.issues[0];
+  if (!issue) return err.paypalName;
+  return issue.description ? `${issue.description} (${issue.issue})` : issue.issue;
+}

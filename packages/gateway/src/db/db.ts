@@ -9,7 +9,7 @@ import Database from "better-sqlite3";
 export type Db = Database.Database;
 
 /** Bump whenever schema.sql changes, and add the step that upgrades older databases to MIGRATIONS. */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 const SCHEMA_SQL = readFileSync(new URL("./schema.sql", import.meta.url), "utf8");
 
@@ -27,6 +27,7 @@ export interface Migration {
 /** In-place, additive upgrades, oldest first. A database at version n runs every step above n. */
 export const MIGRATIONS: Migration[] = [
   { version: 2, description: "PayPal disputes, dispute refunds and invoices (new tables only)" },
+  { version: 3, description: "Purchase refunds (new table only)" },
 ];
 
 /** Open (or create) the database and apply the schema, upgrading an older one in place. Pass ":memory:" for tests. */

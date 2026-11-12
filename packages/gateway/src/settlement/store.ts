@@ -6,10 +6,10 @@
  * micros as text). closeTab adds its carry-out there; createHold moves it into the new tab's
  * `carry_in_micros`; a tab that is cancelled before PayPal authorized it gives its carry-in back.
  */
-import { DEFAULT_POLICY, type Policy } from "@p402/shared";
+import { DEFAULT_POLICY, type Policy, type PurchaseDTO } from "@p402/shared";
 import { AppError, type AppContext } from "../context";
 import { type Db, kvDelete, kvGet, kvSet, parseJson, stmt } from "../db/db";
-import { getSellerDTO, getTabDTO, purchaseDTO, type PurchaseRow, type TabRow } from "../db/dto";
+import { getSellerDTO, getTabDTO, purchaseDTO, type PurchaseRefundRow, type PurchaseRow, type TabRow } from "../db/dto";
 import { PaypalError } from "../paypal/errors";
 import type { SellerGross } from "./math";
 
@@ -99,6 +99,18 @@ export function loadPurchase(db: Db, id: string): PurchaseRow | null {
   return (stmt(db, "SELECT * FROM purchases WHERE id = ?").get(id) as PurchaseRow | undefined) ?? null;
 }
 
+/** Newest first. */
+export function loadPurchaseRefunds(db: Db, purchaseId: string): PurchaseRefundRow[] {
+  return stmt(db, "SELECT * FROM purchase_refunds WHERE purchase_id = ? ORDER BY created_at DESC, rowid DESC").all(
+    purchaseId,
+  ) as PurchaseRefundRow[];
+}
+
+/** A purchase as the API shows it, refunds included. */
+export function purchaseView(db: Db, row: PurchaseRow): PurchaseDTO {
+  return purchaseDTO(row, loadPurchaseRefunds(db, row.id));
+}
+
 // ---------------------------------------------------------------- events
 
 export function emitTab(ctx: Pick<AppContext, "db" | "bus" | "clock">, tabId: string): void {
@@ -115,7 +127,7 @@ export function emitSellers(ctx: Pick<AppContext, "db" | "bus" | "config">, sell
 
 export function emitPurchase(ctx: Pick<AppContext, "db" | "bus">, purchaseId: string): void {
   const row = loadPurchase(ctx.db, purchaseId);
-  if (row) ctx.bus.emit("purchase.updated", purchaseDTO(row));
+  if (row) ctx.bus.emit("purchase.updated", purchaseView(ctx.db, row));
 }
 
 // ---------------------------------------------------------------- carry

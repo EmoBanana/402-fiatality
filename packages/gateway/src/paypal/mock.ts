@@ -26,6 +26,7 @@ import type {
   PaypalDisputeSummary,
   PaypalInvoice,
   PaypalOrder,
+  PaypalOrderRefund,
   PaypalPayoutBatch,
   PaypalPayoutItem,
 } from "../context";
@@ -87,6 +88,8 @@ interface MockCapture {
   createdAt: number;
   /** Given back to the payer by refunds and disputes (absent on records from older builds). */
   refundedCents?: number;
+  /** Payments v2 refunds of this capture, as the order lists them. */
+  refunds?: PaypalOrderRefund[];
 }
 
 interface MockBatch {
@@ -184,12 +187,16 @@ export function createMockPaypal(deps: MockPaypalDeps): PaypalClient {
     });
   }
 
-  const orderView = (order: MockOrder): PaypalOrder => ({
-    id: order.id,
-    status: order.status,
-    approveUrl: order.status === "PAYER_ACTION_REQUIRED" ? mockApproveUrl(deps.config.publicBaseUrl, order.id) : null,
-    ...(order.status === "PAYER_ACTION_REQUIRED" ? {} : { payerEmail: MOCK_PAYER_EMAIL }),
-  });
+  const orderView = (order: MockOrder): PaypalOrder => {
+    const capture = order.captureId ? load<MockCapture>(db, "capture", order.captureId) : null;
+    return {
+      id: order.id,
+      status: order.status,
+      approveUrl: order.status === "PAYER_ACTION_REQUIRED" ? mockApproveUrl(deps.config.publicBaseUrl, order.id) : null,
+      ...(order.status === "PAYER_ACTION_REQUIRED" ? {} : { payerEmail: MOCK_PAYER_EMAIL }),
+      ...(capture ? { captureId: capture.id, ...(capture.refunds?.length ? { refunds: capture.refunds } : {}) } : {}),
+    };
+  };
 
   /** Expiry is evaluated lazily, like PayPal reporting EXPIRED once the 29 days are over. */
   const isExpired = (auth: MockAuthorization) =>
@@ -555,8 +562,14 @@ export function createMockPaypal(deps: MockPaypalDeps): PaypalClient {
         const amount = input.amountCents ?? left;
         if (!Number.isSafeInteger(amount) || amount <= 0) unprocessable(operation, "CANNOT_BE_ZERO_OR_NEGATIVE", "The refund must be at least $0.01.");
         if (amount > left) unprocessable(operation, "REFUND_AMOUNT_EXCEEDED", "The refund exceeds what is left of the capture.");
-        save(db, "capture", capture.id, { ...capture, refundedCents: (capture.refundedCents ?? 0) + amount } satisfies MockCapture);
-        return { id: mockId("REFUND"), status: "COMPLETED", amountCents: amount };
+        const refund = { id: mockId("REFUND"), status: "COMPLETED", amountCents: amount };
+        const listed: PaypalOrderRefund = { ...refund, invoiceId: input.invoiceId };
+        save(db, "capture", capture.id, {
+          ...capture,
+          refundedCents: (capture.refundedCents ?? 0) + amount,
+          refunds: [...(capture.refunds ?? []), listed],
+        } satisfies MockCapture);
+        return refund;
       });
     },
 

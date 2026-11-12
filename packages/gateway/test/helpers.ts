@@ -219,6 +219,7 @@ export function fakeSettlement(ctx: AppContext): FakeSettlement {
     runPayouts: unsupported,
     proposePurchase: unsupported,
     checkoutPurchase: unsupported,
+    refundPurchase: unsupported,
     statement: unsupported,
     start() {},
     stop() {},

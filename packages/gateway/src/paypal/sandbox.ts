@@ -479,6 +479,7 @@ export function createSandboxPaypal(
     refundCapture(captureId, input) {
       const operation = "refund capture";
       return call(operation, async () => {
+        await tokens.get(); // a credential failure surfaces here, as the token request's, before anything is sent
         const { result } = await paymentsApi.refundCapturedPayment({
           captureId,
           paypalRequestId: input.requestId,
@@ -486,11 +487,11 @@ export function createSandboxPaypal(
           body: {
             ...(input.amountCents != null ? { amount: usd(input.amountCents) } : {}),
             invoiceId: input.invoiceId.slice(0, 127),
-            noteToPayer: input.noteToPayer.slice(0, 255),
+            ...(input.noteToPayer ? { noteToPayer: input.noteToPayer.slice(0, 255) } : {}),
           },
         });
         if (!result.id) throw invalidResponse(operation, "the refund has no id");
-        return { id: result.id, status: result.status ?? "UNKNOWN", amountCents: result.amount ? valueToCents(result.amount.value) : (input.amountCents ?? 0) };
+        return { id: result.id, status: result.status ?? "UNKNOWN", amountCents: result.amount ? valueToCents(result.amount.value) : (input.amountCents ?? null) };
       });
     },
 
@@ -577,7 +578,21 @@ export function approveLink(links: LinkDescription[] | undefined): string | null
 function toOrder(order: Order, operation: string): PaypalOrder {
   if (!order.id) throw invalidResponse(operation, "the order has no id");
   const payerEmail = order.paymentSource?.paypal?.emailAddress ?? order.payer?.emailAddress ?? null;
-  return { id: order.id, status: order.status ?? "UNKNOWN", approveUrl: approveLink(order.links), ...(payerEmail ? { payerEmail } : {}) };
+  const payments = order.purchaseUnits?.[0]?.payments;
+  const captureId = payments?.captures?.[0]?.id ?? null;
+  const refunds = (payments?.refunds ?? []).flatMap((r) =>
+    r.id
+      ? [{ id: r.id, status: r.status ?? "UNKNOWN", amountCents: r.amount ? valueToCents(r.amount.value) : null, invoiceId: r.invoiceId ?? null }]
+      : [],
+  );
+  return {
+    id: order.id,
+    status: order.status ?? "UNKNOWN",
+    approveUrl: approveLink(order.links),
+    ...(payerEmail ? { payerEmail } : {}),
+    ...(captureId ? { captureId } : {}),
+    ...(refunds.length ? { refunds } : {}),
+  };
 }
 
 function parseTime(value: string | undefined): number | null {

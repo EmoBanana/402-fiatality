@@ -26,6 +26,7 @@ import {
   type PayoutItemDTO,
   type Policy,
   type PurchaseDTO,
+  type PurchaseRefundDTO,
   type ReviewDTO,
   type ReviewFault,
   type ReviewMessageDTO,
@@ -225,6 +226,18 @@ export interface PurchaseRow {
   research_cost_micros: number;
   reasoning: string | null;
   created_at: number;
+}
+
+export interface PurchaseRefundRow {
+  id: string;
+  purchase_id: string;
+  idempotency_key: string;
+  amount_cents: number;
+  status: PurchaseRefundDTO["status"];
+  paypal_refund_id: string | null;
+  error: string | null;
+  created_at: number;
+  updated_at: number;
 }
 
 export interface DisputeRow {
@@ -556,7 +569,8 @@ export function payoutDTO(db: Db, row: PayoutRow): PayoutDTO {
 
 // ---------------------------------------------------------------- purchases & agent runs
 
-export function purchaseDTO(row: PurchaseRow): PurchaseDTO {
+/** `refunds` are the purchase's purchase_refunds rows, newest first. */
+export function purchaseDTO(row: PurchaseRow, refunds: PurchaseRefundRow[]): PurchaseDTO {
   return {
     id: row.id,
     tabId: row.tab_id,
@@ -570,6 +584,19 @@ export function purchaseDTO(row: PurchaseRow): PurchaseDTO {
     status: row.status,
     researchCostMicros: row.research_cost_micros,
     reasoning: row.reasoning,
+    createdAt: row.created_at,
+    refundedCents: refunds.reduce((sum, r) => (r.status === "completed" ? sum + r.amount_cents : sum), 0),
+    refunds: refunds.map(purchaseRefundDTO),
+  };
+}
+
+export function purchaseRefundDTO(row: PurchaseRefundRow): PurchaseRefundDTO {
+  return {
+    id: row.id,
+    amountCents: row.amount_cents,
+    status: row.status,
+    paypalRefundId: row.paypal_refund_id,
+    error: row.error,
     createdAt: row.created_at,
   };
 }

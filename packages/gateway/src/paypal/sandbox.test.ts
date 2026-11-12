@@ -5,7 +5,7 @@
 import pino from "pino";
 import { describe, expect, it } from "vitest";
 import type { AppConfig } from "../context";
-import { PaypalError } from "./errors";
+import { outcomeUnknown, PaypalError } from "./errors";
 import { createSandboxPaypal } from "./sandbox";
 
 const API = "https://api-m.sandbox.paypal.com";
@@ -268,6 +268,80 @@ describe("sandbox PayPal client (Server SDK)", () => {
       { fetch: (async () => { throw new TypeError("fetch failed"); }) as typeof fetch },
     );
     await expect(offline.getPayoutBatch("B1")).rejects.toMatchObject({ paypalName: "NETWORK_ERROR", status: 502 });
+  });
+});
+
+describe("sandbox PayPal client: purchase refunds (paypal-plan.md)", () => {
+  const input = { amountCents: 1_250, invoiceId: "refund-rfd_1", requestId: "refund-rfd_1" };
+
+  it("sends a refund with only the fields the plan requires", async () => {
+    const { paypal, seen } = setup({
+      "POST /v2/payments/captures/CAP1/refund": () => ({
+        status: 201,
+        body: { id: "REF1", status: "COMPLETED", amount: { currency_code: "USD", value: "12.50" }, invoice_id: "refund-rfd_1" },
+      }),
+    });
+    expect(await paypal.refundCapture("CAP1", input)).toEqual({ id: "REF1", status: "COMPLETED", amountCents: 1_250 });
+
+    const sent = seen.find((s) => s.url === `${API}/v2/payments/captures/CAP1/refund`);
+    expect(sent?.method).toBe("POST");
+    expect(sent?.headers["paypal-request-id"]).toBe("refund-rfd_1");
+    expect(sent?.headers.prefer).toBe("return=representation");
+    expect(sent?.headers.authorization).toBe(`Bearer ${ACCESS_TOKEN}`);
+    // No note_to_payer, custom_id or payment_instruction: nothing requires them.
+    expect(sent?.body).toEqual({ amount: { currency_code: "USD", value: "12.50" }, invoice_id: "refund-rfd_1" });
+  });
+
+  it("takes the amount it sent when PayPal names none", async () => {
+    const { paypal } = setup({ "POST /v2/payments/captures/CAP1/refund": () => ({ status: 201, body: { id: "REF2", status: "PENDING" } }) });
+    expect(await paypal.refundCapture("CAP1", input)).toEqual({ id: "REF2", status: "PENDING", amountCents: 1_250 });
+    expect(await paypal.refundCapture("CAP1", { ...input, amountCents: null })).toEqual({ id: "REF2", status: "PENDING", amountCents: null });
+  });
+
+  it("calls a lost answer unknown, and a token failure a refund that was never sent", async () => {
+    const lost = setup({
+      "POST /v2/payments/captures/CAP1/refund": () => {
+        throw Object.assign(new Error("socket hang up"), { code: "ECONNRESET" });
+      },
+    });
+    const lostErr = await lost.paypal.refundCapture("CAP1", input).catch((e: unknown) => e);
+    expect(lostErr).toMatchObject({ operation: "refund capture", paypalName: "NETWORK_ERROR", httpStatus: null });
+    expect(outcomeUnknown(lostErr, "refund capture")).toBe(true);
+
+    const noToken = setup({
+      "POST /v1/oauth2/token": () => ({ status: 401, body: { error: "invalid_client", error_description: "Client Authentication failed" } }),
+    });
+    const tokenErr = await noToken.paypal.refundCapture("CAP1", input).catch((e: unknown) => e);
+    expect(tokenErr).toMatchObject({ operation: "OAuth token request", httpStatus: 401 });
+    expect(outcomeUnknown(tokenErr, "refund capture")).toBe(false);
+    expect(noToken.seen.some((s) => s.url.endsWith("/refund"))).toBe(false);
+  });
+
+  it("reads the order's capture and refunds, so a lost answer can be found again", async () => {
+    const { paypal } = setup({
+      "GET /v2/checkout/orders/O1": () => ({
+        status: 200,
+        body: {
+          id: "O1",
+          status: "COMPLETED",
+          purchase_units: [
+            {
+              reference_id: "pur_1",
+              payments: {
+                captures: [{ id: "CAP1", status: "PARTIALLY_REFUNDED", amount: { currency_code: "USD", value: "329.00" } }],
+                refunds: [{ id: "REF1", status: "COMPLETED", amount: { currency_code: "USD", value: "12.50" }, invoice_id: "refund-rfd_1" }],
+              },
+            },
+          ],
+        },
+      }),
+    });
+    expect(await paypal.getOrder("O1")).toMatchObject({
+      id: "O1",
+      status: "COMPLETED",
+      captureId: "CAP1",
+      refunds: [{ id: "REF1", status: "COMPLETED", amountCents: 1_250, invoiceId: "refund-rfd_1" }],
+    });
   });
 });
 

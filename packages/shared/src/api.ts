@@ -306,6 +306,8 @@ export interface StatementDTO {
   invoice?: InvoiceDTO | null;
   /** PayPal disputes opened on this tab's charge, newest first. */
   disputes?: DisputeDTO[];
+  /** The agent's purchases on this tab (paid separately from the tab), with their refunds. */
+  purchases?: PurchaseDTO[];
   generatedAt: number;
 }
 
@@ -499,6 +501,37 @@ export interface PurchaseDTO {
   researchCostMicros: Micros;
   reasoning?: string | null;
   createdAt: number;
+  /** Given back to the buyer so far (completed refunds only). */
+  refundedCents?: number;
+  /** Refunds of this purchase, newest first. */
+  refunds?: PurchaseRefundDTO[];
+}
+
+/** A refund of a captured purchase (PayPal Payments v2). */
+export interface PurchaseRefundDTO {
+  id: string;
+  amountCents: number;
+  /**
+   * processing: sent, no answer yet · completed · pending: PayPal is still processing it · failed: PayPal reported it
+   * FAILED or CANCELLED · rejected: PayPal refused the request (see error) · unknown: PayPal didn't confirm it either
+   * way; asking again with the same key is safe.
+   */
+  status: "processing" | "completed" | "pending" | "failed" | "rejected" | "unknown";
+  paypalRefundId?: string | null;
+  error?: string | null;
+  createdAt: number;
+}
+
+/** POST /api/purchases/:id/refund. Leave amountCents out to refund everything that is left. */
+export interface PurchaseRefundRequestDTO {
+  amountCents?: number;
+  /** Same key, same refund: a retry or a double click never refunds twice. The console sends one per confirm. */
+  idempotencyKey?: string;
+}
+
+export interface PurchaseRefundResultDTO {
+  purchase: PurchaseDTO;
+  refund: PurchaseRefundDTO;
 }
 
 // ---------------------------------------------------------------- metrics, clock, AI

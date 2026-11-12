@@ -23,9 +23,9 @@ const tables = (db: Database.Database) =>
 describe("openDb", () => {
   it("creates a new database at the current schema version", () => {
     const db = openDb(":memory:");
-    expect(SCHEMA_VERSION).toBe(2);
+    expect(SCHEMA_VERSION).toBe(3);
     expect(db.pragma("user_version", { simple: true })).toBe(SCHEMA_VERSION);
-    expect(tables(db)).toEqual(expect.arrayContaining(["disputes", "dispute_refunds", "invoices", "settlements", "kv"]));
+    expect(tables(db)).toEqual(expect.arrayContaining(["disputes", "dispute_refunds", "invoices", "purchase_refunds", "settlements", "kv"]));
     expect(MIGRATIONS.at(-1)?.version).toBe(SCHEMA_VERSION);
     db.close();
   });
@@ -41,7 +41,7 @@ describe("openDb", () => {
     v1.close();
 
     const db = openDb(path);
-    expect(db.pragma("user_version", { simple: true })).toBe(2);
+    expect(db.pragma("user_version", { simple: true })).toBe(SCHEMA_VERSION);
     expect(tables(db)).toEqual(expect.arrayContaining(["disputes", "dispute_refunds", "invoices"]));
     expect(db.prepare("SELECT name FROM companies").all()).toEqual([{ name: "Northwind Research" }]);
     expect(db.prepare("SELECT value FROM kv WHERE key = 'clock.offset_ms'").get()).toEqual({ value: "86400000" });
@@ -53,6 +53,23 @@ describe("openDb", () => {
     const again = openDb(path);
     expect(again.prepare("SELECT id FROM disputes").all()).toEqual([{ id: "PP-D-1" }]);
     again.close();
+  });
+
+  it("upgrades a v2 database with the purchase refunds table and keeps its purchases", () => {
+    const path = tempDb();
+    const v2 = openDb(path);
+    v2.exec("DROP TABLE purchase_refunds;");
+    v2.prepare(
+      "INSERT INTO purchases (id, title, amount_cents, status, capture_id, created_at) VALUES ('pur_1', 'Espresso machine', 14900, 'captured', 'CAP1', 1)",
+    ).run();
+    v2.pragma("user_version = 2");
+    v2.close();
+
+    const db = openDb(path);
+    expect(db.pragma("user_version", { simple: true })).toBe(3);
+    expect(tables(db)).toContain("purchase_refunds");
+    expect(db.prepare("SELECT id, status FROM purchases").all()).toEqual([{ id: "pur_1", status: "captured" }]);
+    db.close();
   });
 
   it("refuses a database from a newer build", () => {

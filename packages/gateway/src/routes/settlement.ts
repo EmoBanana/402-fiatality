@@ -9,9 +9,9 @@ import type { FastifyReply } from "fastify";
 import { z } from "zod";
 import type { AppContext, RoutePlugin } from "../context";
 import { stmt } from "../db/db";
-import { payoutDTO, purchaseDTO, settlementDTO, type PayoutRow, type PurchaseRow, type SettlementRow } from "../db/dto";
+import { payoutDTO, settlementDTO, type PayoutRow, type PurchaseRow, type SettlementRow } from "../db/dto";
 import { approveMockOrder, getMockOrder } from "../paypal/mock";
-import { cancelApproval, completeApproval, DEFAULT_PAYOUT_THRESHOLD_CENTS, rescheduleTab } from "../settlement";
+import { cancelApproval, completeApproval, DEFAULT_PAYOUT_THRESHOLD_CENTS, purchaseView, rescheduleTab } from "../settlement";
 import { checkReturnPage, type HtmlPage, messagePage, mockApprovalPage, returnPage } from "../settlement/pages";
 
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, "Invalid id");
@@ -43,6 +43,11 @@ const purchaseBody = z.object({
   imageUrl: imageUrl.optional(),
   researchCostMicros: z.number().int().min(0).max(1_000_000_000_000),
   reasoning: z.string().trim().max(4_000).optional(),
+});
+/** No amount: refund everything that is left. */
+const refundBody = z.object({
+  amountCents: z.number().int().min(1).max(1_000_000).optional(),
+  idempotencyKey: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/, "Invalid idempotency key").optional(),
 });
 const mockDecision = z.object({ token: orderToken, action: z.enum(["approve", "cancel"]) });
 
@@ -199,7 +204,7 @@ export const settlementRoutes: RoutePlugin = async (app, { ctx }) => {
       ctx.db,
       "SELECT * FROM purchases WHERE (@tabId IS NULL OR tab_id = @tabId) ORDER BY created_at DESC, rowid DESC LIMIT @limit",
     ).all({ tabId: tabId ?? null, limit }) as PurchaseRow[];
-    return rows.map(purchaseDTO);
+    return rows.map((row) => purchaseView(ctx.db, row));
   });
 
   app.post("/api/purchases", async (req, reply) => {
@@ -210,5 +215,13 @@ export const settlementRoutes: RoutePlugin = async (app, { ctx }) => {
   app.post("/api/purchases/:id/checkout", async (req) => {
     const { id: purchaseId } = idParams.parse(req.params);
     return ctx.settlement.checkoutPurchase(purchaseId);
+  });
+
+  /** 201 refunded (or PayPal is processing it), 200 the same key again, 202 PayPal hasn't confirmed it either way. */
+  app.post("/api/purchases/:id/refund", async (req, reply) => {
+    const { id: purchaseId } = idParams.parse(req.params);
+    const { result, replay } = await ctx.settlement.refundPurchase(purchaseId, refundBody.parse(req.body ?? {}));
+    const open = result.refund.status === "processing" || result.refund.status === "unknown";
+    return reply.code(open ? 202 : replay ? 200 : 201).send(result);
   });
 };

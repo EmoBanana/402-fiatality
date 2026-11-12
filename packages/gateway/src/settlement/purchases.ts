@@ -12,10 +12,10 @@ import {
 } from "@p402/shared";
 import { AppError } from "../context";
 import { stmt } from "../db/db";
-import { purchaseDTO, type PurchaseRow } from "../db/dto";
+import type { PurchaseRow } from "../db/dto";
 import { PaypalError } from "../paypal/errors";
 import { BRAND_NAME, paypalReturnUrls, returnMessage } from "./holds";
-import { emitPurchase, loadPurchase, requireTab, type SettlementContext, withLock } from "./store";
+import { emitPurchase, loadPurchase, purchaseView, requireTab, type SettlementContext, withLock } from "./store";
 
 function requirePurchase(ctx: SettlementContext, id: string): PurchaseRow {
   const row = loadPurchase(ctx.db, id);
@@ -46,7 +46,7 @@ export async function proposePurchase(ctx: SettlementContext, input: PurchasePro
   );
   emitPurchase(ctx, id);
   ctx.log.info({ purchaseId: id, tabId: input.tabId, amountCents: input.amountCents }, "purchase proposed");
-  return purchaseDTO(requirePurchase(ctx, id));
+  return purchaseView(ctx.db, requirePurchase(ctx, id));
 }
 
 /**
@@ -57,7 +57,7 @@ export async function checkoutPurchase(ctx: SettlementContext, purchaseId: strin
   return withLock(ctx.db, `purchase:${purchaseId}`, async () => {
     const row = requirePurchase(ctx, purchaseId);
     if (row.status === "captured") throw new AppError(409, "purchase_captured", "This purchase was already paid.");
-    if (row.status === "awaiting_approval" && row.approve_url) return { purchase: purchaseDTO(row), approveUrl: row.approve_url };
+    if (row.status === "awaiting_approval" && row.approve_url) return { purchase: purchaseView(ctx.db, row), approveUrl: row.approve_url };
 
     const research = `${formatUsd(row.research_cost_micros)} of agent research`;
     const order = await ctx.paypal.createCaptureOrder({
@@ -78,7 +78,7 @@ export async function checkoutPurchase(ctx: SettlementContext, purchaseId: strin
       row.id,
     );
     emitPurchase(ctx, row.id);
-    return { purchase: purchaseDTO(requirePurchase(ctx, row.id)), approveUrl: order.approveUrl };
+    return { purchase: purchaseView(ctx.db, requirePurchase(ctx, row.id)), approveUrl: order.approveUrl };
   });
 }
 
