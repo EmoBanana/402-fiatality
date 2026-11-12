@@ -6,7 +6,8 @@ import { defineConfig, loadEnv, type ProxyOptions } from "vite";
 const envDir = fileURLToPath(new URL("../..", import.meta.url));
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, envDir, ["PORT"]);
+  // PORT is the gateway's (the proxy target), WEB_PORT this dev server's; shell variables win over .env.
+  const env = loadEnv(mode, envDir, ["PORT", "WEB_PORT"]);
   const gateway = `http://localhost:${env.PORT || "4020"}`;
   // "^/s/" is a RegExp key: a plain "/s" prefix would also capture the /sellers and /statements pages.
   const proxy: Record<string, ProxyOptions> = {
@@ -19,7 +20,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     envDir,
-    server: { port: 5173, strictPort: true, proxy },
+    server: { port: Number(env.WEB_PORT) || 5173, strictPort: true, proxy },
     preview: { port: 4173, strictPort: true, proxy },
     build: {
       outDir: "dist",

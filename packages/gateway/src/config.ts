@@ -129,6 +129,8 @@ const envSchema = z.object({
   HOST: z.preprocess(blankToUndefined, z.string().default("localhost")),
   PORT: port(4020),
   SELLERS_PORT: port(4030),
+  /** The Vite dev server's port (npm run dev); only the default WEB_BASE_URL reads it here. */
+  WEB_PORT: port(5173),
   PUBLIC_BASE_URL: origin,
   WEB_BASE_URL: origin,
   SELLERS_BASE_URL: origin,
@@ -204,7 +206,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     port: e.PORT,
     sellersPort: e.SELLERS_PORT,
     publicBaseUrl,
-    webBaseUrl: trimSlash(e.WEB_BASE_URL ?? (serveWeb ? publicBaseUrl : "http://localhost:5173")),
+    webBaseUrl: trimSlash(e.WEB_BASE_URL ?? (serveWeb ? publicBaseUrl : `http://localhost:${e.WEB_PORT}`)),
     sellersBaseUrl: trimSlash(e.SELLERS_BASE_URL ?? `http://localhost:${e.SELLERS_PORT}`),
     demo: e.DEMO_MODE,
     adminToken: e.ADMIN_TOKEN ?? null,

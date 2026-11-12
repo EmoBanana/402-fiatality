@@ -22,6 +22,13 @@ describe("config", () => {
     expect(c.reviewBudgetMs).toBe(45_000);
   });
 
+  it("derives the local URLs from the ports, so a second copy can run beside the first", () => {
+    const c = loadConfig({ PORT: "10000", SELLERS_PORT: "4031", WEB_PORT: "5174", PUBLIC_BASE_URL: "", WEB_BASE_URL: "" });
+    expect(c.publicBaseUrl).toBe("http://localhost:10000");
+    expect(c.sellersBaseUrl).toBe("http://localhost:4031");
+    expect(c.webBaseUrl).toBe("http://localhost:5174");
+  });
+
   it("parses values, treats blanks as unset and trims trailing slashes", () => {
     const c = loadConfig({
       PORT: "5000",
