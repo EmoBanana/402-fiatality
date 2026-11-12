@@ -39,6 +39,8 @@ import type {
   PurchaseCheckoutDTO,
   PurchaseDTO,
   PurchaseProposalDTO,
+  PurchaseRefundRequestDTO,
+  PurchaseRefundResultDTO,
   ReviewDecisionDTO,
   ReviewDTO,
   SellerCreateDTO,
@@ -245,6 +247,8 @@ export const api = {
     create: (body: PurchaseProposalDTO) => post<PurchaseDTO>("/api/purchases", body),
     /** Creates the PayPal CAPTURE order: open `approveUrl` (see lib/paypal.ts). */
     checkout: (id: string) => post<PurchaseCheckoutDTO>(`/api/purchases/${seg(id)}/checkout`),
+    /** Refund a paid purchase. Send the same idempotencyKey again to retry: it never refunds twice. */
+    refund: (id: string, body: PurchaseRefundRequestDTO) => post<PurchaseRefundResultDTO>(`/api/purchases/${seg(id)}/refund`, body),
   },
 
   metrics: {

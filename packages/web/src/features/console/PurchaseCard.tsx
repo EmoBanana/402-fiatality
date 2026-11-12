@@ -15,6 +15,7 @@ import { useToast } from "../../components/Toast";
 import { api } from "../../lib/api";
 import { getGatewayConfig, useGatewayConfig } from "../../lib/config";
 import { openPaypalApproval, preparePaypalPopup } from "../../lib/paypal";
+import { PurchaseRefund } from "./PurchaseRefund";
 import { clearApproval, trackApproval, useApproval } from "./session";
 
 async function gatewayOrigin(): Promise<string> {
@@ -91,7 +92,7 @@ export function PurchaseCard({ purchase, onUpdate }: { purchase: PurchaseDTO; on
           </p>
         </div>
         <div className="cs-purchase-price">
-          <PurchaseStatusBadge status={purchase.status} />
+          <PurchaseStatusBadge purchase={purchase} />
           <Money cents={purchase.amountCents} className="cs-purchase-amount" />
         </div>
       </div>
@@ -109,9 +110,7 @@ export function PurchaseCard({ purchase, onUpdate }: { purchase: PurchaseDTO; on
 
       <div className="cs-purchase-actions">
         {captured ? (
-          <p className="cs-purchase-done">
-            Purchased through PayPal{purchase.paypalOrderId ? <span className="mono muted"> · order {purchase.paypalOrderId}</span> : null}
-          </p>
+          <PurchaseRefund purchase={purchase} onUpdate={onUpdate} />
         ) : phase === "waiting" ? (
           <>
             <span className="cs-note">

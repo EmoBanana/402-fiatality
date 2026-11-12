@@ -929,6 +929,35 @@
   color: var(--success);
 }
 
+.cs-purchase-done[data-refunded] {
+  color: var(--ink-2);
+}
+
+.cs-refund {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+}
+
+.cs-refund-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.cs-refund-confirm .ui-field {
+  width: min(240px, 100%);
+}
+
+.cs-refund-buttons {
+  display: flex;
+  gap: 8px;
+  padding-bottom: 2px;
+}
+
 /* ------------------------------------------------------------ close + settlement */
 
 .cs-close-text {

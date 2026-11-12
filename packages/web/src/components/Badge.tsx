@@ -65,8 +65,17 @@ export const PURCHASE_STATUS_BADGE: Record<PurchaseDTO["status"], BadgeSpec> = {
   failed: { label: "Failed", tone: "danger" },
 };
 
-export function PurchaseStatusBadge({ status }: { status: PurchaseDTO["status"] }) {
-  const { label, tone } = PURCHASE_STATUS_BADGE[status] ?? { label: status, tone: "neutral" };
+/** A paid purchase reads Refunded or Partly refunded once money went back to the buyer. */
+export function purchaseStatusSpec(purchase: Pick<PurchaseDTO, "status" | "amountCents" | "refundedCents">): BadgeSpec {
+  const refunded = purchase.refundedCents ?? 0;
+  if (purchase.status === "captured" && refunded > 0) {
+    return refunded >= purchase.amountCents ? { label: "Refunded", tone: "neutral" } : { label: "Partly refunded", tone: "warning" };
+  }
+  return PURCHASE_STATUS_BADGE[purchase.status] ?? { label: purchase.status, tone: "neutral" };
+}
+
+export function PurchaseStatusBadge({ purchase }: { purchase: Pick<PurchaseDTO, "status" | "amountCents" | "refundedCents"> }) {
+  const { label, tone } = purchaseStatusSpec(purchase);
   return (
     <Badge tone={tone} dot>
       {label}

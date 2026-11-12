@@ -1,13 +1,13 @@
 /**
  * Printable statement for one tab (SPEC §9.2): the one PayPal charge, what was billable, carried and voided,
  * fees against per-call payments, the per-seller split, PayPal disputes on the charge (with the AI jury's
- * recommendation) and the PayPal references, including the invoice recorded for the charge. Prints black on
- * white without the app chrome (statement.css + base.css print rules).
+ * recommendation), the agent's purchases with their refunds, and the PayPal references, including the invoice
+ * recorded for the charge. Prints black on white without the app chrome (statement.css + base.css print rules).
  */
-import type { DisputeDTO, InvoiceDTO, StatementDTO } from "@p402/shared";
+import type { DisputeDTO, InvoiceDTO, PurchaseDTO, PurchaseRefundDTO, StatementDTO } from "@p402/shared";
 import { useEffect } from "react";
 import { Link, useParams } from "react-router";
-import { TabStatusBadge } from "../components/Badge";
+import { purchaseStatusSpec, TabStatusBadge } from "../components/Badge";
 import { Button, buttonClassName } from "../components/Button";
 import { Callout } from "../components/Callout";
 import { EmptyState } from "../components/EmptyState";
@@ -112,6 +112,65 @@ function Disputes({ disputes }: { disputes: DisputeDTO[] }) {
           },
         ]}
         footer={refunded > 0 ? { dispute: "Refunded to you through disputes", amount: <Money cents={refunded} padTo={2} /> } : undefined}
+      />
+    </section>
+  );
+}
+
+const REFUND_STATUS: Record<PurchaseRefundDTO["status"], string> = {
+  completed: "refunded",
+  pending: "pending at PayPal",
+  processing: "sent to PayPal",
+  unknown: "not confirmed yet",
+  failed: "failed at PayPal",
+  rejected: "refused by PayPal",
+};
+
+/** What the agent bought on this tab: paid by separate PayPal checkouts, not part of the tab's charge. */
+function Purchases({ purchases }: { purchases: PurchaseDTO[] }) {
+  const refunded = purchases.reduce((sum, p) => sum + (p.refundedCents ?? 0), 0);
+  return (
+    <section aria-labelledby="st-purchases" className="st-section">
+      <h2 id="st-purchases">Purchases</h2>
+      <Table
+        caption="Paid by separate PayPal checkouts, not part of the charge above"
+        rows={purchases}
+        rowKey={(p) => p.id}
+        columns={[
+          {
+            key: "purchase",
+            header: "Purchase",
+            render: (p) => (
+              <span className="st-dispute">
+                {p.title}
+                <small>
+                  {p.merchant ? `${p.merchant} · ` : ""}
+                  {p.paypalOrderId ? <span className="mono">{p.paypalOrderId}</span> : formatDate(p.createdAt)}
+                </small>
+              </span>
+            ),
+          },
+          { key: "status", header: "Status", render: (p) => purchaseStatusSpec(p).label },
+          {
+            key: "refunds",
+            header: "Refunds",
+            render: (p) =>
+              p.refunds?.length ? (
+                <span className="st-dispute">
+                  {p.refunds.map((r) => (
+                    <small key={r.id}>
+                      <Money cents={r.amountCents} padTo={2} /> {REFUND_STATUS[r.status]}
+                      {r.paypalRefundId ? <span className="mono"> · {r.paypalRefundId}</span> : null}
+                    </small>
+                  ))}
+                </span>
+              ) : (
+                <span className="muted">None</span>
+              ),
+          },
+          { key: "amount", header: "Paid", align: "right", render: (p) => <Money cents={p.amountCents} padTo={2} /> },
+        ]}
+        footer={refunded > 0 ? { purchase: "Refunded to you", amount: <Money cents={refunded} padTo={2} /> } : undefined}
       />
     </section>
   );
@@ -261,6 +320,7 @@ function StatementBody({ statement }: { statement: StatementDTO }) {
       </section>
 
       {statement.disputes?.length ? <Disputes disputes={statement.disputes} /> : null}
+      {statement.purchases?.length ? <Purchases purchases={statement.purchases} /> : null}
 
       <div className="st-columns st-section">
         <section aria-labelledby="st-voids">
