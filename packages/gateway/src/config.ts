@@ -43,6 +43,16 @@ export interface SellerEmails {
   reviews: string | null;
 }
 
+/** Per-IP limits on the routes that call PayPal, the LLM or start agents (src/http/rateLimit.ts). 0 turns one off. */
+export interface RateLimitConfig {
+  /** Holds, charges, checkouts, refunds, payouts, dispute calls and the demo clock, per minute. */
+  paypalPerMinute: number;
+  /** Policy parsing, "ask the ledger" and the AI jury per minute; AG Studio's chat proxy gets its own bucket this size. */
+  aiPerMinute: number;
+  /** In-process agent runs per 10 minutes. */
+  agentRunsPer10Minutes: number;
+}
+
 export interface AppConfig {
   rootDir: string;
   /** `<root>/data` unless DATA_DIR says otherwise: SQLite file, generated master key. Gitignored. */
@@ -57,9 +67,12 @@ export interface AppConfig {
   host: string;
   port: number;
   sellersPort: number;
-  /** Origin the gateway is reachable at (PayPal return URLs, paywall URLs). No trailing slash. */
+  /**
+   * Origin the gateway is reachable at (PayPal return URLs, paywall URLs). No trailing slash.
+   * PUBLIC_BASE_URL, else Render's RENDER_EXTERNAL_URL, else http://localhost:<PORT>.
+   */
   publicBaseUrl: string;
-  /** Origin of the web app (CORS, post-approval redirects). No trailing slash. */
+  /** Origin of the web app (CORS, post-approval redirects). No trailing slash. The gateway's own when it serves the app. */
   webBaseUrl: string;
   /** Where the demo seller APIs listen. No trailing slash. */
   sellersBaseUrl: string;
@@ -67,6 +80,12 @@ export interface AppConfig {
   demo: boolean;
   /** Required header `x-p402-admin` on mutating /api routes when demo is off. */
   adminToken: string | null;
+  /**
+   * Reverse proxies in front of the gateway whose X-Forwarded-For entries are trusted for the client IP:
+   * TRUST_PROXY_HOPS, else 2 on Render (its load balancer, then Cloudflare), else 0 (never locally).
+   */
+  trustProxyHops: number;
+  rateLimits: RateLimitConfig;
   logLevel: string;
   paypal: PaypalConfig;
   llm: LlmConfig;
@@ -94,6 +113,7 @@ const blankToUndefined = (value: unknown) => {
 
 const optionalText = z.preprocess(blankToUndefined, z.string().optional());
 const port = (fallback: number) => z.preprocess(blankToUndefined, z.coerce.number().int().min(0).max(65_535).default(fallback));
+const limit = (fallback: number) => z.preprocess(blankToUndefined, z.coerce.number().int().min(0).max(100_000).default(fallback));
 const origin = z.preprocess(blankToUndefined, z.url({ protocol: /^https?$/ }).optional());
 const flag = (fallback: boolean) =>
   z.preprocess(
@@ -131,6 +151,13 @@ const envSchema = z.object({
   MASTER_KEY: optionalText,
   DATA_DIR: optionalText,
   FLAKY_RATE: z.preprocess(blankToUndefined, z.coerce.number().min(0).max(1).default(0.3)),
+  TRUST_PROXY_HOPS: z.preprocess(blankToUndefined, z.coerce.number().int().min(0).max(10).optional()),
+  RATE_LIMIT_PAYPAL_PER_MINUTE: limit(30),
+  RATE_LIMIT_AI_PER_MINUTE: limit(30),
+  RATE_LIMIT_AGENT_RUNS_PER_10_MINUTES: limit(10),
+  // Set by Render on every service; a platform value never stops startup.
+  RENDER: optionalText,
+  RENDER_EXTERNAL_URL: origin.catch(undefined),
 });
 
 const DEFAULT_LLM_BASE_URL: Record<LlmProvider, string> = {
@@ -163,21 +190,30 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
 
   const dataDir = e.DATA_DIR ? resolve(ROOT_DIR, e.DATA_DIR) : join(ROOT_DIR, "data");
+  const serveWeb = e.NODE_ENV === "production";
+  // On Render, blank URLs mean the service's own onrender.com address, which also serves the web app.
+  const publicBaseUrl = trimSlash(e.PUBLIC_BASE_URL ?? e.RENDER_EXTERNAL_URL ?? `http://localhost:${e.PORT}`);
   return {
     rootDir: ROOT_DIR,
     dataDir,
     dbPath: join(dataDir, "p402.sqlite"),
     nodeEnv: e.NODE_ENV,
-    serveWeb: e.NODE_ENV === "production",
+    serveWeb,
     webDistDir: join(ROOT_DIR, "packages", "web", "dist"),
     host: e.HOST,
     port: e.PORT,
     sellersPort: e.SELLERS_PORT,
-    publicBaseUrl: trimSlash(e.PUBLIC_BASE_URL ?? `http://localhost:${e.PORT}`),
-    webBaseUrl: trimSlash(e.WEB_BASE_URL ?? "http://localhost:5173"),
+    publicBaseUrl,
+    webBaseUrl: trimSlash(e.WEB_BASE_URL ?? (serveWeb ? publicBaseUrl : "http://localhost:5173")),
     sellersBaseUrl: trimSlash(e.SELLERS_BASE_URL ?? `http://localhost:${e.SELLERS_PORT}`),
     demo: e.DEMO_MODE,
     adminToken: e.ADMIN_TOKEN ?? null,
+    trustProxyHops: e.TRUST_PROXY_HOPS ?? (e.RENDER ? 2 : 0),
+    rateLimits: {
+      paypalPerMinute: e.RATE_LIMIT_PAYPAL_PER_MINUTE,
+      aiPerMinute: e.RATE_LIMIT_AI_PER_MINUTE,
+      agentRunsPer10Minutes: e.RATE_LIMIT_AGENT_RUNS_PER_10_MINUTES,
+    },
     logLevel: e.LOG_LEVEL ?? (e.NODE_ENV === "test" ? "silent" : "info"),
     paypal: {
       mode: e.PAYPAL_MODE,

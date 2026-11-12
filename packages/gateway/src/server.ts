@@ -1,5 +1,5 @@
 /**
- * The Fastify app: global security (helmet, CORS, /api rate limit, admin guard), error and 404 handling for
+ * The Fastify app: global security (helmet, CORS, /api rate limits, admin guard), error and 404 handling for
  * every route (including the settlement routes), the REST API, the paywall, /ws, and the built web app.
  */
 import { existsSync } from "node:fs";
@@ -14,6 +14,7 @@ import { AppError, type AppContext, type RoutePlugin } from "./context";
 import { createCore, type CoreOptions } from "./core";
 import { errorHandler } from "./http/errors";
 import { ADMIN_HEADER, adminGuard, isApiPath, isServicePath, routePath, webPageHeaders } from "./http/guards";
+import { expensiveRouteLimits, trustProxyHops } from "./http/rateLimit";
 import { paywallRoutes } from "./paywall/route";
 import { agentRoutes } from "./routes/agents";
 import { aiRoutes } from "./routes/ai";
@@ -46,6 +47,8 @@ export async function buildServer(ctx: AppContext, opts: BuildServerOptions = {}
     logController: new LogController({ disableRequestLogging: true }),
     bodyLimit: 1024 * 1024,
     return503OnClosing: true,
+    // Behind Render's proxies request.ip is the client from X-Forwarded-For; locally the header is never trusted.
+    trustProxy: ctx.config.trustProxyHops > 0 ? trustProxyHops(ctx.config.trustProxyHops) : false,
   }) as unknown as FastifyInstance;
 
   app.setErrorHandler(errorHandler);
@@ -82,7 +85,9 @@ export async function buildServer(ctx: AppContext, opts: BuildServerOptions = {}
     allowList: (request) => !isApiPath(routePath(request)),
     errorResponseBuilder: (_request, context) => new AppError(429, "rate_limited", `Too many requests: try again in ${context.after}.`),
   });
-  // After CORS and the rate limit, so a 401 still carries CORS headers and floods are limited first.
+  // Much tighter per-IP limits on the routes that call PayPal, the LLM or start agents (localhost is exempt).
+  app.addHook("onRequest", expensiveRouteLimits(app, ctx.config.rateLimits));
+  // After CORS and the rate limits, so a 401 still carries CORS headers and floods are limited first.
   app.addHook("onRequest", adminGuard(ctx.config));
   await app.register(websocket, { options: { maxPayload: 4 * 1024 } });
 
