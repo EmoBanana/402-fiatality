@@ -13,9 +13,9 @@ import {
 import { AppError } from "../context";
 import { stmt } from "../db/db";
 import type { PurchaseRow } from "../db/dto";
-import { PaypalError } from "../paypal/errors";
+import { outcomeUnknown, PaypalError } from "../paypal/errors";
 import { BRAND_NAME, paypalReturnUrls, returnMessage } from "./holds";
-import { emitPurchase, loadPurchase, purchaseView, requireTab, type SettlementContext, withLock } from "./store";
+import { emitPurchase, errorFields, loadPurchase, purchaseView, requireTab, type SettlementContext, withLock } from "./store";
 
 function requirePurchase(ctx: SettlementContext, id: string): PurchaseRow {
   const row = loadPurchase(ctx.db, id);
@@ -102,12 +102,36 @@ export async function approvePurchase(ctx: SettlementContext, purchaseId: string
       ctx.log.info({ purchaseId, captureId: capture.id, amountCents: capture.amountCents }, "purchase captured");
       return returnMessage("purchase", purchaseId, "approved");
     } catch (err) {
+      // No answer, an unreadable one or a 5xx: PayPal may have taken the money, so the outcome is unknown, not failed.
+      if (outcomeUnknown(err, "capture order")) return settleLostCapture(ctx, purchaseId, orderId);
       stmt(ctx.db, "UPDATE purchases SET status = 'failed' WHERE id = ? AND status != 'captured'").run(purchaseId);
       emitPurchase(ctx, purchaseId);
       ctx.log.warn({ purchaseId, orderId }, "purchase capture failed");
       return returnMessage("purchase", purchaseId, "failed", err instanceof Error ? err.message : "PayPal could not complete the payment.");
     }
   });
+}
+
+/**
+ * After a capture whose answer was lost: re-read the order. Captured there, the purchase is captured here; otherwise
+ * it stays awaiting approval (never failed), and reloading the return page asks again with the same request id.
+ */
+async function settleLostCapture(ctx: SettlementContext, purchaseId: string, orderId: string): Promise<PaypalReturnMessage> {
+  let captureId: string | null = null;
+  try {
+    const order = await ctx.paypal.getOrder(orderId);
+    if (order.status === "COMPLETED") captureId = order.captureId ?? null;
+  } catch (err) {
+    ctx.log.warn({ purchaseId, orderId, ...errorFields(err) }, "purchase order re-read failed");
+  }
+  if (!captureId) {
+    ctx.log.warn({ purchaseId, orderId }, "purchase capture outcome unknown");
+    return returnMessage("purchase", purchaseId, "failed", "PayPal did not confirm the payment yet. Reload this page in a minute to check again.");
+  }
+  stmt(ctx.db, "UPDATE purchases SET status = 'captured', capture_id = ? WHERE id = ?").run(captureId, purchaseId);
+  emitPurchase(ctx, purchaseId);
+  ctx.log.info({ purchaseId, captureId }, "purchase captured (found by re-reading the order)");
+  return returnMessage("purchase", purchaseId, "approved");
 }
 
 /** /paypal/cancel?kind=purchase. Idempotent. */

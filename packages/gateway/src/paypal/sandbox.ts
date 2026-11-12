@@ -283,6 +283,7 @@ export function createSandboxPaypal(
     captureOrder(orderId, requestId) {
       const operation = "capture order";
       return call(operation, async () => {
+        await tokens.get(); // a credential failure surfaces here, as the token request's, before anything is sent
         const { result } = await ordersApi.captureOrder({ id: orderId, paypalRequestId: requestId, prefer: REPRESENTATION, body: {} });
         const capture = result.purchaseUnits?.[0]?.payments?.captures?.[0];
         if (!capture) throw invalidResponse(operation, "the response has no capture");
