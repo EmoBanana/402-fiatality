@@ -14,7 +14,7 @@ Built for the PayPal AI Hackathon on Devpost, 2026. It runs fully offline in moc
 
 ## Live demo
 
-**Live demo: _link coming soon_**. It runs on Render with Gemma 4 on the Gemini API (`gemma-4-26b-a4b-it`), so there's nothing to install.
+**Live demo: _link coming soon_**. It runs on Render with Gemma 4 on the Gemini API (`gemma-4-26b-a4b-it`), so there's nothing to install. It's on Render's free plan: after 15 idle minutes it sleeps, the first visit takes about a minute to wake it, and its data starts fresh.
 
 - In the console's first step, click **Add company** to open your own tab (a company has one open tab at a time).
 - The PayPal pages are PayPal's real sandbox. Approve holds and purchases with your own sandbox buyer account (developer.paypal.com → Testing Tools → Sandbox Accounts) or the test buyer in the Devpost notes. No real money moves.
@@ -255,7 +255,7 @@ Only what the code uses:
 | **Bryntum Scheduler** 8 | `packages/web/src/features/timeline` | Every tab's hold on one schedule: honor windows, reauthorization, the charge, payouts. Drag a planned charge to reschedule it. |
 | **Channel3** product API | `packages/sellers/src/demoSellers.ts` | The product data the shopping agent pays for (`POST /v1/search`, `GET /v1/products/:id`) when `CHANNEL3_API_KEY` is set. The offline demo catalog has the same shape. |
 | **Google Gemma 4** via **Ollama**, and on the **Gemini API** for the live demo | `packages/ai` | Policy drafting, the shopping agent, the spend review, the dispute jury, grid queries and the AG Studio assistant (next section). |
-| **Render** | `render.yaml`, `packages/gateway/src/config.ts`, `packages/gateway/src/http/rateLimit.ts` | Hosts the live demo from one Blueprint. A Node web service in Oregon builds the web app on Render's build pipeline, then runs the gateway (API, paywall, WebSocket and the built app on Render's `PORT`) and the demo sellers (loopback only) together in about 200 MB. SQLite and the master key sit on a 1 GB persistent disk; `/api/health` is the health check; every push to `main` deploys; secrets are `sync: false` values. Blank URLs fall back to `RENDER_EXTERNAL_URL`, and the per-IP rate limits read the client's IP through Render's proxy. |
+| **Render** | `render.yaml`, `packages/gateway/src/config.ts`, `packages/gateway/src/http/rateLimit.ts` | Hosts the live demo from one Blueprint. A Node web service in Oregon builds the web app on Render's build pipeline, then runs the gateway (API, paywall, WebSocket and the built app on Render's `PORT`) and the demo sellers (loopback only) together in about 250 MB. It fits the free plan: SQLite and the master key live on temporary storage, and the demo data is seeded again after each restart or sleep (a paid plan with a disk would keep them); `/api/health` is the health check; every push to `main` deploys; secrets are `sync: false` values. Blank URLs fall back to `RENDER_EXTERNAL_URL`, and the per-IP rate limits read the client's IP through Render's proxy. |
 
 Also: Fastify 5, better-sqlite3, zod 4, ajv, pino, React 19, React Router 7, Vite 8, Vitest 5 and TypeScript 5.9 run through tsx. The AG Grid, AG Studio and Bryntum license keys are optional `VITE_*` values in `.env`; without them those components run as watermarked trials.
 

@@ -1,14 +1,16 @@
 # Render Blueprint for the public 402 Fiatality demo (https://render.com/docs/blueprint-spec).
 # One Node web service: the gateway (REST API, x402 paywall, /ws and the built web app) on Render's PORT, and the
-# demo seller APIs on loopback only (SELLERS_PORT, default 4030). SQLite and the generated master key live on the disk.
+# demo seller APIs on loopback only (SELLERS_PORT, default 4030). On the free plan the filesystem is temporary: SQLite and
+# the generated master key start over after a restart, a deploy or a sleep, and the demo company and sellers are seeded again.
 # Values marked `sync: false` are asked for once, when the Blueprint is created; change them later under Environment.
 services:
   - type: web
     name: fiatality
     runtime: node
     region: oregon
-    # 0.5 CPU / 512 MB (plan id 0.5c-512mb). The build runs on Render's build pipeline, not on this instance.
-    plan: starter
+    # Free: 512 MB, nothing charged; it sleeps after 15 idle minutes (the next visit wakes it in about a minute) and has
+    # no disk. To keep data across restarts: plan starter, a disk mounted at /var/data and DATA_DIR=/var/data.
+    plan: free
     branch: main
     autoDeployTrigger: commit
     buildCommand: npm ci && npm run build
@@ -20,17 +22,11 @@ services:
       "cd packages/gateway && NODE_ENV=production exec node --max-old-space-size=256 --import tsx src/index.ts"
       "cd packages/sellers && exec node --max-old-space-size=64 --import tsx src/server.ts"
     healthCheckPath: /api/health
-    disk:
-      name: fiatality-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: NODE_VERSION
         value: "22"
       - key: HOST
         value: "0.0.0.0"
-      - key: DATA_DIR
-        value: /var/data
       - key: DEMO_MODE
         value: "1"
       - key: PAYPAL_MODE
@@ -56,7 +52,7 @@ services:
       # Optional: blank = the built-in demo catalog seller.
       - key: CHANNEL3_API_KEY
         sync: false
-      # Optional: blank = generated once into /var/data/master.key.
+      # Optional: blank = generated into data/master.key at start (a new one after each restart on the free plan).
       - key: MASTER_KEY
         sync: false
       # Optional: sandbox emails that receive seller payouts.
