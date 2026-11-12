@@ -5,10 +5,11 @@ import { createLlm } from "../src/llm";
 import { isLlmError, LlmError } from "../src/llm/errors";
 import { parseJsonReply } from "../src/llm/json";
 import { createMockLlm } from "../src/llm/mock";
-import { openAiApiRoot } from "../src/llm/openai";
+import { openAiApiRoot, stripThought, THINKING_ROOM_TOKENS } from "../src/llm/openai";
 import {
   downServerUrl,
   type FakeHandler,
+  type FakeReply,
   type FakeServer,
   fakeFetch,
   lastMessage,
@@ -241,6 +242,68 @@ describe("openai-compatible provider", () => {
     expect(await llm.health()).toEqual({ reachable: true, model });
     expect(api.requests.map((r) => `${r.method} ${r.url}`)).toEqual([`POST ${root}/chat/completions`, `GET ${root}/models`]);
     expect(api.requests[0]!.headers.authorization).toBe("Bearer test-key");
+  });
+
+  describe("Gemma 4 on the Gemini API", () => {
+    const gemini = (handler: FakeHandler) => {
+      const api = fakeFetch(handler);
+      const llm = createLlm(
+        config("openai", "https://generativelanguage.googleapis.com/v1beta/openai", { model: "gemma-4-26b-a4b-it", apiKey: "k" }),
+        { fetch: api.fetch, retryDelayMs: 1 },
+      );
+      return { llm, requests: api.requests };
+    };
+    const internalError: FakeReply = { status: 500, json: [{ error: { code: 500, message: "Internal error encountered.", status: "INTERNAL" } }] };
+
+    it("repeats a request the server failed with a 500, then answers", async () => {
+      const { llm, requests } = gemini((_req, i) => (i < 2 ? internalError : openAiReply('{"sum":42,"color":"blue"}')));
+      expect(await llm.json([{ role: "user", content: "?" }], sumSchema)).toEqual({ sum: 42, color: "blue" });
+      expect(requests).toHaveLength(3);
+      expect(requests[2]!.body).toEqual(requests[0]!.body);
+    });
+
+    it("gives up after three retries with the server's message, and never repeats a 4xx", async () => {
+      const down = gemini(() => internalError);
+      const err = await rejection(down.llm.chat([{ role: "user", content: "hi" }]));
+      expect(err.code).toBe("http");
+      expect(err.message).toMatch(/HTTP 500: Internal error encountered/);
+      expect(down.requests).toHaveLength(4);
+
+      const invalid = gemini(() => ({ status: 400, json: [{ error: { code: 400, message: "Request contains an invalid argument." } }] }));
+      await rejection(invalid.llm.chat([{ role: "user", content: "hi" }]));
+      expect(invalid.requests).toHaveLength(1);
+    });
+
+    it("drops the reasoning the model writes before its answer", async () => {
+      const { llm } = gemini((_req, i) =>
+        openAiReply(i === 0 ? "<thought>*   Constraint: one sentence.</thought>Pay per call when usage is uneven." : '<thought>sum it</thought>\n{"sum":42,"color":"blue"}'),
+      );
+      expect(await llm.chat([{ role: "user", content: "?" }])).toBe("Pay per call when usage is uneven.");
+      expect(await llm.json([{ role: "user", content: "?" }], sumSchema)).toEqual({ sum: 42, color: "blue" });
+    });
+
+    it("asks once more with room to think when the reasoning used up max_tokens", async () => {
+      const { llm, requests } = gemini((_req, i) =>
+        i === 0 ? openAiReply("<thought>*   Question: should the agent be frozen?\n    *   Facts:", "length") : openAiReply("<thought>Yes.</thought>Freeze it."),
+      );
+      expect(await llm.chat([{ role: "user", content: "?" }], { maxTokens: 80 })).toBe("Freeze it.");
+      expect(requests.map((r) => r.body.max_tokens)).toEqual([80, 80 + THINKING_ROOM_TOKENS]);
+    });
+
+    it("cleans the AG Studio proxy's replies the same way", async () => {
+      const { llm, requests } = gemini((_req, i) =>
+        i === 0 ? internalError : i === 1 ? openAiReply("<thought>One sentence.", "length") : openAiReply("<thought>Done.</thought>It costs less."),
+      );
+      const reply = await llm.chatCompletion({ messages: [{ role: "user", content: "Why pay per call?" }], max_tokens: 80 });
+      expect(reply.choices[0]!.message.content).toBe("It costs less.");
+      expect(requests.map((r) => r.body.max_tokens)).toEqual([80, 80, 80 + THINKING_ROOM_TOKENS]);
+    });
+
+    it("only removes a reasoning block at the start of a reply", () => {
+      expect(stripThought("Plain answer <thought>quoted</thought>")).toEqual({ text: "Plain answer <thought>quoted</thought>", cutOff: false });
+      expect(stripThought("<think>r1 style</think>\nAnswer")).toEqual({ text: "Answer", cutOff: false });
+      expect(stripThought("<thought>never closed")).toEqual({ text: "", cutOff: true });
+    });
   });
 
   it("matches Gemini's models/ ids but still flags a model the server lacks", async () => {

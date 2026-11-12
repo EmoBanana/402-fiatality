@@ -1,6 +1,11 @@
 /**
  * Any OpenAI-compatible server: POST {root}/chat/completions with `response_format: json_schema`
  * for structured output, GET {root}/models for health. {root} comes from LLM_BASE_URL (openAiApiRoot).
+ *
+ * Hosted Gemma 4 (Gemini API) needs two allowances, harmless elsewhere: a share of requests fail with a 500
+ * that the same request then passes, so 5xx answers are retried; and the model reasons out loud before
+ * answering (`<thought>…</thought>`, which no request option turns off), so that block is removed and a
+ * reasoning that used up max_tokens is asked once more with room to finish.
  */
 import type { LlmCallOptions, LlmConfig, LlmHealth, LlmMessage } from "@p402/gateway/context";
 import type { ChatRequestDTO, ChatResponseDTO } from "@p402/shared";
@@ -13,10 +18,40 @@ import { type AiLlmClient, CHAT_PROXY_TIMEOUT_MS, type ChatCompletionOptions, DE
 
 export interface OpenAiOptions {
   fetch?: FetchFn;
+  /** First pause before retrying a 5xx answer (default 500 ms; tests shorten it). */
+  retryDelayMs?: number;
 }
 
 interface ChatCompletionBody {
   choices?: Array<{ message?: { content?: unknown }; finish_reason?: unknown }>;
+}
+
+/** Retries for a 500/502/503/504 answer (Gemini fails a share of Gemma 4 requests that pass when repeated). */
+const SERVER_ERROR_RETRIES = 3;
+/** Extra output tokens when a model's reasoning used up max_tokens before it answered. */
+export const THINKING_ROOM_TOKENS = 2_048;
+
+/** Reasoning a server puts before the answer: Gemma 4 on Gemini writes <thought>…</thought>, DeepSeek-style models <think>…</think>. */
+const LEADING_THOUGHT = /^\s*<(thought|think)>[\s\S]*?(?:<\/\1>\s*|$)/;
+
+/** The answer after a leading reasoning block; cutOff when the block never closed (the token limit came first). */
+export function stripThought(content: string): { text: string; cutOff: boolean } {
+  const match = LEADING_THOUGHT.exec(content);
+  if (!match) return { text: content, cutOff: false };
+  return { text: content.slice(match[0].length), cutOff: !match[0].trimEnd().endsWith(`</${match[1]}>`) };
+}
+
+/** The reply without each choice's leading reasoning; thoughtCutOff when a reasoning ran into the token limit. */
+function withoutThoughts(body: ChatResponseDTO): { body: ChatResponseDTO; thoughtCutOff: boolean } {
+  let thoughtCutOff = false;
+  const choices = body.choices.map((choice) => {
+    const content = choice?.message?.content;
+    if (typeof content !== "string") return choice;
+    const answer = stripThought(content);
+    if (answer.cutOff && choice.finish_reason === "length") thoughtCutOff = true;
+    return answer.text === content ? choice : { ...choice, message: { ...choice.message, content: answer.text } };
+  });
+  return { body: { ...body, choices }, thoughtCutOff };
 }
 
 /** A path segment that names an API version: v1, v2, v1beta, v1alpha, v1beta1. */
@@ -53,28 +88,38 @@ export function createOpenAiLlm(config: LlmConfig, opts: OpenAiOptions = {}): Ai
       fetchImpl: opts.fetch,
       service: "The LLM server",
       unreachableHint,
+      serverErrorRetries: SERVER_ERROR_RETRIES,
+      retryDelayMs: opts.retryDelayMs,
     });
   }
 
   async function complete(messages: LlmMessage[], callOpts: LlmCallOptions, responseFormat?: unknown): Promise<Completion> {
-    const result = await call(
-      "/chat/completions",
-      {
-        model,
-        messages,
-        stream: false,
-        temperature: callOpts.temperature ?? 0.2,
-        max_tokens: callOpts.maxTokens ?? (responseFormat === undefined ? 512 : 1_024),
-        ...(responseFormat === undefined ? {} : { response_format: responseFormat }),
-      },
-      callOpts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-      callOpts.signal,
-    );
-    if (!result.ok) throw httpError(result, model);
-    const choice = (result.body as ChatCompletionBody | null)?.choices?.[0];
-    const content = choice?.message?.content;
-    if (typeof content !== "string") throw new LlmError("bad_response", "The LLM server reply has no message content");
-    return { content, truncated: choice?.finish_reason === "length" };
+    const maxTokens = callOpts.maxTokens ?? (responseFormat === undefined ? 512 : 1_024);
+    const send = async (tokens: number) => {
+      const result = await call(
+        "/chat/completions",
+        {
+          model,
+          messages,
+          stream: false,
+          temperature: callOpts.temperature ?? 0.2,
+          max_tokens: tokens,
+          ...(responseFormat === undefined ? {} : { response_format: responseFormat }),
+        },
+        callOpts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        callOpts.signal,
+      );
+      if (!result.ok) throw httpError(result, model);
+      const choice = (result.body as ChatCompletionBody | null)?.choices?.[0];
+      const content = choice?.message?.content;
+      if (typeof content !== "string") throw new LlmError("bad_response", "The LLM server reply has no message content");
+      const truncated = choice?.finish_reason === "length";
+      const answer = stripThought(content);
+      return { content: answer.text, truncated, thoughtCutOff: answer.cutOff && truncated };
+    };
+    let reply = await send(maxTokens);
+    if (reply.thoughtCutOff) reply = await send(maxTokens + THINKING_ROOM_TOKENS);
+    return { content: reply.content, truncated: reply.truncated };
   }
 
   return {
@@ -127,18 +172,25 @@ export function createOpenAiLlm(config: LlmConfig, opts: OpenAiOptions = {}): Ai
     },
 
     async chatCompletion(request: ChatRequestDTO, callOpts: ChatCompletionOptions = {}): Promise<ChatResponseDTO> {
-      const result = await call(
-        "/chat/completions",
-        { ...request, model, stream: false },
-        callOpts.timeoutMs ?? CHAT_PROXY_TIMEOUT_MS,
-        callOpts.signal,
-      );
-      if (!result.ok) throw httpError(result, model);
-      const body = result.body as ChatResponseDTO | null;
-      if (!body || !Array.isArray(body.choices) || body.choices.length === 0) {
-        throw new LlmError("bad_response", "The LLM server reply has no choices");
+      const send = async (body: ChatRequestDTO) => {
+        const result = await call(
+          "/chat/completions",
+          { ...body, model, stream: false },
+          callOpts.timeoutMs ?? CHAT_PROXY_TIMEOUT_MS,
+          callOpts.signal,
+        );
+        if (!result.ok) throw httpError(result, model);
+        const reply = result.body as ChatResponseDTO | null;
+        if (!reply || !Array.isArray(reply.choices) || reply.choices.length === 0) {
+          throw new LlmError("bad_response", "The LLM server reply has no choices");
+        }
+        return withoutThoughts(reply);
+      };
+      let reply = await send(request);
+      if (reply.thoughtCutOff && typeof request.max_tokens === "number") {
+        reply = await send({ ...request, max_tokens: request.max_tokens + THINKING_ROOM_TOKENS });
       }
-      return { ...body, object: "chat.completion" };
+      return { ...reply.body, object: "chat.completion" };
     },
   };
 }

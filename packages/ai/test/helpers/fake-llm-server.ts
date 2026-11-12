@@ -131,14 +131,14 @@ export function ollamaTags(...names: string[]): FakeReply {
 }
 
 /** An OpenAI chat.completions reply. */
-export function openAiReply(content: string): FakeReply {
+export function openAiReply(content: string, finishReason: "stop" | "length" = "stop"): FakeReply {
   return {
     json: {
       id: "chatcmpl-test",
       object: "chat.completion",
       created: 1,
       model: "test-model",
-      choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }],
+      choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: finishReason }],
     },
   };
 }

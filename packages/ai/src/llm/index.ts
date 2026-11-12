@@ -10,6 +10,8 @@ export interface CreateLlmOptions {
   fetch?: FetchFn;
   /** Ollama context window for every request (default 8192). */
   numCtx?: number;
+  /** OpenAI-compatible servers: first pause before retrying a 5xx answer (default 500 ms; tests shorten it). */
+  retryDelayMs?: number;
 }
 
 /** The configured LLM: Ollama (native API), any OpenAI-compatible server, or the offline mock. */
