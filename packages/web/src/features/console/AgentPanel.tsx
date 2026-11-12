@@ -3,7 +3,7 @@
  * with its cost. Also shows how to point your own agent at the tab from the terminal.
  */
 import type { AgentMode, AgentRunDTO, TabDetailDTO } from "@p402/shared";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AgentRunStatusBadge } from "../../components/Badge";
 import { Button } from "../../components/Button";
 import { CopyButton } from "../../components/CopyButton";
@@ -64,6 +64,15 @@ export function AgentPanel({ tab, runs, onRun }: AgentPanelProps) {
   // Follow the newest run when one starts.
   const newestId = runs[0]?.id ?? null;
   useEffect(() => setSelectedId(newestId), [newestId]);
+
+  // The run list carries no steps: load a finished run's steps once, when it is shown (after a reload, or an older run).
+  const stepsLoaded = useRef(new Set<string>());
+  useEffect(() => {
+    if (!run || run.status === "running" || run.steps.length > 0 || stepsLoaded.current.has(run.id)) return;
+    const id = run.id;
+    stepsLoaded.current.add(id);
+    api.agentRuns.get(id).then(onRun, () => stepsLoaded.current.delete(id));
+  }, [run, onRun]);
 
   const blocked =
     tab.status === "pending_approval"
