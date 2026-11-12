@@ -310,7 +310,7 @@ packages/
   agent/     x402 client, the shopping agent (llm, scripted, runaway) and its CLI
   sellers/   Demo seller APIs: Channel3-shaped catalog, PriceWatch, ReviewPulse
   web/       React 19 + Vite dashboard: landing, console, terminal, jury, sellers, insights, timeline, statements
-docs/        SPEC.md (blueprint), BINDING.md, ARCHITECTURE.md, PROGRESS.md
+docs/        SPEC.md (blueprint), BINDING.md, ARCHITECTURE.md
 ```
 
 Node packages run TypeScript directly through tsx; only the web app has a build step.

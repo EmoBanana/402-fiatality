@@ -15,3 +15,7 @@ packages/web/dist/
 .vite/
 playwright-report/
 test-results/
+
+# Local notes for Claude Code, kept out of the repo
+CLAUDE.md
+docs/PROGRESS.md
