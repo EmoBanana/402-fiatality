@@ -2,12 +2,17 @@
 import { ConfigError, loadConfig, loadDotEnv } from "@p402/gateway/config";
 import { startDemoSellers } from "./app";
 
+const LOOPBACK = new Set(["localhost", "127.0.0.1", "::1"]);
+
 try {
   loadDotEnv();
   const config = loadConfig();
+  // Only the gateway calls the sellers, at SELLERS_BASE_URL (default http://localhost:<SELLERS_PORT>). When that is
+  // loopback, listen there even if HOST=0.0.0.0 opens the gateway: on Render only PORT should face the internet.
+  const sellersHost = new URL(config.sellersBaseUrl).hostname.replace(/^\[|\]$/g, "");
   const sellers = await startDemoSellers({
     port: config.sellersPort,
-    host: config.host,
+    host: LOOPBACK.has(sellersHost) ? sellersHost : config.host,
     flakyRate: config.flakyRate,
     logRequests: true,
   });

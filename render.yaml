@@ -1,0 +1,80 @@
+# Render Blueprint for the public 402 Fiatality demo (https://render.com/docs/blueprint-spec).
+# One Node web service: the gateway (REST API, x402 paywall, /ws and the built web app) on Render's PORT, and the
+# demo seller APIs on loopback only (SELLERS_PORT, default 4030). SQLite and the generated master key live on the disk.
+# Values marked `sync: false` are asked for once, when the Blueprint is created; change them later under Environment.
+services:
+  - type: web
+    name: fiatality
+    runtime: node
+    region: oregon
+    # 0.5 CPU / 512 MB (plan id 0.5c-512mb). The build runs on Render's build pipeline, not on this instance.
+    plan: starter
+    branch: main
+    autoDeployTrigger: commit
+    buildCommand: npm ci && npm run build
+    # Starts what the build made (npm start would rebuild the web app first). Plain `node --import tsx` instead of
+    # npx/npm/tsx wrappers: 3 processes and about 200 MB instead of 10 and 700 MB (RSS, measured in mock mode), and
+    # `exec` hands Render's SIGTERM straight to node for a clean shutdown.
+    startCommand: >-
+      node_modules/.bin/concurrently -k -n gateway,sellers
+      "cd packages/gateway && NODE_ENV=production exec node --max-old-space-size=256 --import tsx src/index.ts"
+      "cd packages/sellers && exec node --max-old-space-size=64 --import tsx src/server.ts"
+    healthCheckPath: /api/health
+    disk:
+      name: fiatality-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: HOST
+        value: "0.0.0.0"
+      - key: DATA_DIR
+        value: /var/data
+      - key: DEMO_MODE
+        value: "1"
+      - key: PAYPAL_MODE
+        value: sandbox
+      - key: PAYPAL_INVOICE_RECORDS
+        value: "1"
+      - key: FLAKY_RATE
+        value: "0.3"
+      - key: LLM_PROVIDER
+        value: openai
+      - key: LLM_BASE_URL
+        value: https://generativelanguage.googleapis.com/v1beta/openai
+      - key: LLM_MODEL
+        value: gemma-4-26b-a4b-it
+      # Required: the PayPal sandbox app (the service won't start in sandbox mode without it).
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      # Gemini API key for Gemma.
+      - key: LLM_API_KEY
+        sync: false
+      # Optional: blank = the built-in demo catalog seller.
+      - key: CHANNEL3_API_KEY
+        sync: false
+      # Optional: blank = generated once into /var/data/master.key.
+      - key: MASTER_KEY
+        sync: false
+      # Optional: sandbox emails that receive seller payouts.
+      - key: SELLER_PAYPAL_EMAIL_CHANNEL3
+        sync: false
+      - key: SELLER_PAYPAL_EMAIL_PRICEWATCH
+        sync: false
+      - key: SELLER_PAYPAL_EMAIL_REVIEWS
+        sync: false
+      # Optional UI licenses, read at build time (watermarked trials without them).
+      - key: VITE_AG_GRID_LICENSE_KEY
+        sync: false
+      - key: VITE_AG_STUDIO_LICENSE_KEY
+        sync: false
+      - key: VITE_BRYNTUM_LICENSE_KEY
+        sync: false
+      # Optional: blank = the service's onrender.com URL (RENDER_EXTERNAL_URL). Set both for a custom domain.
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: WEB_BASE_URL
+        sync: false
