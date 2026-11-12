@@ -190,6 +190,8 @@ LLM_API_KEY=...
 
 A base URL whose path already names an API version (Gemini's `…/v1beta/openai`, Groq's `…/openai/v1`, OpenRouter's `…/api/v1`) is used as given; any other gets `/v1`, as Ollama needs.
 
+Gemma 4 on the Gemini API reasons out loud (`<thought>…</thought>` before the answer, with no option to turn it off), and fails a share of requests with HTTP 500, often for several attempts in a row. The client removes the reasoning, gives it more room when the reasoning uses up the token limit, and retries a 5xx answer three times. When Gemma still doesn't answer in time, the app uses its fallbacks: the regex policy parser, the grid rules, and a spend review that escalates to a human. Measured on Nov 12 with `npm run check:llm`: health, structured output, policy parsing, the three-role review and the chat proxy passed, but not all in the same run.
+
 ## Mock vs sandbox
 
 | | Mock (`PAYPAL_MODE=mock`) | Sandbox (`PAYPAL_MODE=sandbox`) |
@@ -334,12 +336,12 @@ Node packages run TypeScript directly through tsx; only the web app has a build 
 
 ## Testing
 
-`npm test` runs **434 tests in 39 files**, offline: in-memory SQLite, mock PayPal, the mock LLM, and fake sellers and LLM servers on local ports.
+`npm test` runs **440 tests in 39 files**, offline: in-memory SQLite, mock PayPal, the mock LLM, and fake sellers and LLM servers on local ports.
 
 | Package | Tests | Highlights |
 |---|---:|---|
 | gateway | 259 | The paywall verification matrix (every 402 reason), concurrent double-spend, quality guard rules, alarms and reviews, settlement math and ledger invariants, the scheduler (day 4, day 7, small tabs, expiry, sandbox honor window), payouts, mock PayPal rules, the sandbox client against fake PayPal responses (Orders, Payments, Payouts, Disputes v1, Invoicing v2, refunds), purchase refunds (one refund per idempotency key, a double click, the invariants checked before PayPal is asked, a lost answer settled by re-reading the order, PayPal's refusals), a lost capture answer, disputes end to end on the mock (holds, the jury, a partial refund deducted once, the 10-day deadline, unlinked disputes, demo-only routes), invoice records, schema upgrades, per-IP rate limits behind a proxy, SSRF and admin-guard cases, an end-to-end run over real HTTP |
-| ai | 117 | Policy parsing, structured output and retries, review decisions and prompt fencing, the dispute jury (ledger rules, fencing the buyer's message, a scripted model, fallback, budget), grid queries, the chat proxy, base URLs for Ollama, Gemini, Groq and OpenRouter |
+| ai | 123 | Policy parsing, structured output and retries, Gemma 4 on the Gemini API (5xx retries, reasoning blocks, Gemini's error shape), review decisions and prompt fencing, the dispute jury (ledger rules, fencing the buyer's message, a scripted model, fallback, budget), grid queries, the chat proxy, base URLs for Ollama, Gemini, Groq and OpenRouter |
 | agent | 25 | x402 client: pay on first request, quotes, resync, pauses, foreign-origin refusal; all three agent modes |
 | sellers | 13 | Demo seller behavior and listings |
 | shared | 12 | Money math, fee functions, vouchers, request hash, header encoding |
